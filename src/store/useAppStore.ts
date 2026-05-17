@@ -1,35 +1,134 @@
 import { create } from 'zustand';
 
-interface Match {
+export interface UserProfile {
+  name: string;
+  gender: string;
+  age: string;
+  height: string;
+  city: string;
+  profession: string;
+  education: string;
+  isWaliMode: boolean;
+  waliPhone?: string;
+  sect?: string;
+  deenLevel?: string;
+}
+
+export interface Match {
   id: string;
   name: string;
   blurAvatar: string;
   compatibility: number;
   tags: string[];
   status: 'new' | 'negotiating' | 'revealed';
+  age: number;
+  city: string;
+  profession: string;
+}
+
+export interface DebateMessage {
+  speaker: 'userTwin' | 'candidateTwin' | 'moderator';
+  text: string;
 }
 
 interface AppState {
-  user: { name: string; isWaliMode: boolean } | null;
+  user: UserProfile | null;
   matches: Match[];
   isPremium: boolean;
-  debateLog: { speaker: 'userTwin' | 'candidateTwin' | 'moderator', text: string }[];
+  debateLog: DebateMessage[];
+  currentMatchId: string | null;
+  setUserProfile: (profile: Partial<UserProfile>) => void;
   toggleWaliMode: () => void;
   setPremium: (val: boolean) => void;
+  updateMatchStatus: (matchId: string, status: Match['status']) => void;
+  setCurrentMatchId: (matchId: string | null) => void;
+  clearDebateLog: () => void;
+  addDebateMessage: (msg: DebateMessage) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  user: { name: 'User', isWaliMode: false },
+  user: {
+    name: 'Ayesha Khan',
+    gender: 'Female',
+    age: '24',
+    height: "5'4\"",
+    city: 'Lahore',
+    profession: 'Clinical Psychologist',
+    education: 'MSc Clinical Psychology',
+    isWaliMode: false,
+    waliPhone: '',
+    sect: 'Sunni',
+    deenLevel: 'Practicing',
+  },
   isPremium: false,
+  currentMatchId: null,
   matches: [
-    { id: '1', name: 'Ayesha K.', blurAvatar: 'https://i.pravatar.cc/150?u=1', compatibility: 94, tags: ['Deen Aligned', 'Career Focused'], status: 'new' },
-    { id: '2', name: 'Fatima Z.', blurAvatar: 'https://i.pravatar.cc/150?u=2', compatibility: 88, tags: ['Family Oriented', 'Same Sect'], status: 'new' },
+    {
+      id: '1',
+      name: 'Bilal Siddiqui',
+      blurAvatar: 'https://i.pravatar.cc/150?u=11',
+      compatibility: 94,
+      tags: ['Deen Aligned', 'Career Focused', 'Same Sect'],
+      status: 'new',
+      age: 27,
+      city: 'Karachi',
+      profession: 'Software Engineer'
+    },
+    {
+      id: '2',
+      name: 'Zainab Bibi',
+      blurAvatar: 'https://i.pravatar.cc/150?u=22',
+      compatibility: 88,
+      tags: ['Family Oriented', 'Joint Family Setup'],
+      status: 'new',
+      age: 24,
+      city: 'Lahore',
+      profession: 'Educator'
+    },
+    {
+      id: '3',
+      name: 'Hamza Malik',
+      blurAvatar: 'https://i.pravatar.cc/150?u=33',
+      compatibility: 82,
+      tags: ['Flexible Lifestyle', 'Sect Compatible'],
+      status: 'new',
+      age: 29,
+      city: 'Islamabad',
+      profession: 'Chartered Accountant'
+    }
   ],
   debateLog: [
-    { speaker: 'userTwin', text: 'Career growth is essential. Relocation is acceptable if parity remains.' },
-    { speaker: 'candidateTwin', text: 'We prioritize family proximity, but are open to 1-2 years abroad.' },
-    { speaker: 'moderator', text: 'Friction point identified: Geography. Potential compromise mapped.' },
+    { speaker: 'userTwin', text: 'Assalam o Alaikum. Career growth is extremely essential to me, and I wish to continue practice post-marriage.' },
+    { speaker: 'candidateTwin', text: 'Walaikum Assalam. I fully support professional career growth. Family balance is also crucial for me.' },
+    { speaker: 'moderator', text: 'Round 1: Career & Ambition. Strong alignment detected: Both value professional work with mutual support.' }
   ],
-  toggleWaliMode: () => set((state) => ({ user: state.user ? { ...state.user, isWaliMode: !state.user.isWaliMode } : null })),
+  setUserProfile: (profile) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, ...profile } : {
+        name: '',
+        gender: 'Female',
+        age: '',
+        height: '',
+        city: '',
+        profession: '',
+        education: '',
+        isWaliMode: false,
+        ...profile
+      } as UserProfile
+    })),
+  toggleWaliMode: () =>
+    set((state) => ({
+      user: state.user ? { ...state.user, isWaliMode: !state.user.isWaliMode } : null
+    })),
   setPremium: (isPremium) => set({ isPremium }),
+  updateMatchStatus: (matchId, status) =>
+    set((state) => ({
+      matches: state.matches.map((m) => (m.id === matchId ? { ...m, status } : m))
+    })),
+  setCurrentMatchId: (currentMatchId) => set({ currentMatchId }),
+  clearDebateLog: () => set({ debateLog: [] }),
+  addDebateMessage: (msg) =>
+    set((state) => ({
+      debateLog: [...state.debateLog, msg]
+    }))
 }));

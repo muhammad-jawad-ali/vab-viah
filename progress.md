@@ -8,37 +8,37 @@
 - [x] Verify NativeWind + Tailwind config on iOS/Android
 
 ## Phase 2: Auth Flow (Day 1–2)
-- [ ] Polish SignupScreen — keyboard handling, country picker animation
-- [ ] Polish ProfileSetupScreen — form validation, error states
-- [ ] Wire Zustand: persist user data on profile submit
-- [ ] Test full flow: Signup → ProfileSetup → TwinOnboarding → Main
+- [x] Polish SignupScreen — keyboard handling, country picker animation
+- [x] Polish ProfileSetupScreen — form validation, error states
+- [x] Wire Zustand: persist user data on profile submit
+- [x] Test full flow: Signup → ProfileSetup → TwinOnboarding → Main
 
 ## Phase 3: Twin Onboarding (Day 2)
-- [ ] Implement voice recording UI (mock waveform animation)
-- [ ] Add 3–5 scenario cards with swipe/tap interactions
-- [ ] Generate Twin summary text (mock Gemini response)
-- [ ] Add Wali Mode toggle into TwinOnboardingScreen
-- [ ] Persist Twin spec to Zustand
+- [x] Implement voice recording UI (mock waveform animation)
+- [x] Add 3–5 scenario cards with swipe/tap interactions
+- [x] Generate Twin summary text (mock Gemini response)
+- [x] Add Wali Mode toggle into TwinOnboardingScreen
+- [x] Persist Twin spec to Zustand
 
 ## Phase 4: Match Pool & Debate (Day 2–3)
-- [ ] Populate MatchPoolScreen with 5+ mock candidates
-- [ ] Implement streaming debate UI with typing indicators and timed message reveal
-- [ ] Add debate round indicators (current dimension being debated)
-- [ ] Build compatibility report with animated progress bars
-- [ ] Wire Paywall gate: redirect if `!isPremium` and 3+ matches viewed
+- [x] Populate MatchPoolScreen with 5+ mock candidates
+- [x] Implement streaming debate UI with typing indicators and timed message reveal
+- [x] Add debate round indicators (current dimension being debated)
+- [x] Build compatibility report with animated progress bars
+- [x] Wire Paywall gate: redirect if `!isPremium` and 3+ matches viewed
 
 ## Phase 5: Meetings & Post-Meeting (Day 3)
-- [ ] Polish BookingScreen with venue suggestions (mock Maps data)
-- [ ] Build VideoMeetingScreen with timer, PiP, controls
-- [ ] Implement FeedbackSurvey with interactive star ratings
-- [ ] Wire DisputeForm → BlockModal flow
-- [ ] Add baseline comparison UI (hackathon requirement)
+- [x] Polish BookingScreen with venue suggestions (mock Maps data)
+- [x] Build VideoMeetingScreen with timer, PiP, controls
+- [x] Implement FeedbackSurvey with interactive star ratings
+- [x] Wire DisputeForm → BlockModal flow
+- [x] Add baseline comparison UI (hackathon requirement)
 
 ## Phase 6: Wali & Settings (Day 3–4)
-- [ ] Expand WaliDashboard with multiple pending approvals
-- [ ] Add Wali Agent rishta brief generation (mock)
-- [ ] Polish Settings with working toggles
-- [ ] Wire HelpDesk FAQ with expandable items
+- [x] Expand WaliDashboard with multiple pending approvals
+- [x] Add Wali Agent rishta brief generation (mock)
+- [x] Polish Settings with working toggles
+- [x] Wire HelpDesk FAQ with expandable items
 
 ## Phase 7: Polish & Demo Prep (Day 4)
 - [ ] Add micro-animations: screen transitions, card reveals, score counting

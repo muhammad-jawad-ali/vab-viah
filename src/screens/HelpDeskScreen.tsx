@@ -1,46 +1,74 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation } from 'react-native';
+import { AgTrace } from '../components/AgTrace';
 
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+const FAQItem = ({ q, a }: { q: string; a: string }) => {
+  const [expanded, setExpanded] = useState(false);
 
-const FAQItem = ({ q, a }: { q: string, a: string }) => (
-  <View className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-4">
-    <Text className="text-slate-900 font-bold mb-2 text-lg">{q}</Text>
-    <Text className="text-slate-500 leading-relaxed">{a}</Text>
-  </View>
-);
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
+  return (
+    <TouchableOpacity 
+      onPress={toggleExpand}
+      activeOpacity={0.8}
+      className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm mb-4"
+    >
+      <View className="flex-row justify-between items-center">
+        <Text className="text-slate-800 font-bold text-[14.5px] flex-1 pr-4">{q}</Text>
+        <Text className="text-emerald-800 font-bold text-base">{expanded ? '−' : '+'}</Text>
+      </View>
+      {expanded && (
+        <Text className="text-slate-500 text-xs leading-relaxed mt-3 pt-3 border-t border-slate-50">
+          {a}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 export const HelpDeskScreen = () => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
-      <ScrollView className="p-6">
+    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-slate-50">
+      <AgTrace msg="SUPPORT_ORCHESTRATOR: RETRIEVING INTERACTIVE FAQ DATABASE..." />
+      
+      <ScrollView className="p-6" showsVerticalScrollIndicator={false}>
         
-        <View className="mb-8 mt-4 border-b border-primary/10 pb-6">
-          <Text className="text-secondary font-bold text-xs uppercase tracking-[0.2em] mb-2">Support</Text>
-          <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">Help Desk</Text>
+        <View className="mb-6 mt-4 border-b border-slate-100 pb-5">
+          <Text className="text-amber-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Support Desk</Text>
+          <Text className="text-3.5xl font-serif font-bold text-slate-900 leading-tight">Help Desk</Text>
+          <Text className="text-slate-400 text-xs mt-1">Instant assistance for families and guardians.</Text>
         </View>
 
-        <TouchableOpacity className="bg-primary py-5 rounded-2xl items-center shadow-lg shadow-primary/20 mb-8 flex-row justify-center">
+        <TouchableOpacity className="bg-emerald-800 py-5 rounded-2xl items-center shadow-lg shadow-emerald-800/10 mb-6 flex-row justify-center">
           <Text className="text-xl mr-3">💬</Text>
-          <Text className="text-surface font-bold text-sm tracking-widest uppercase">Chat with Human Agent</Text>
+          <Text className="text-white font-bold text-sm tracking-widest uppercase">Chat with Support Wali</Text>
         </TouchableOpacity>
 
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">Frequently Asked Questions</Text>
+        <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">Frequently Asked Questions</Text>
         
         <FAQItem 
-          q="How does the AI Twin work?" 
-          a="Your AI Twin is trained during the onboarding flow. It negotiates preliminary values (like career goals and family boundaries) with potential matches before you even see them, saving you from repetitive conversations." 
+          q="How does the AI Twin negotiation work?" 
+          a="Your AI Twin is initialized with your background, values, and deen level. When matching, your Twin joins a secure sandbox with potential matches' Twins. They exchange career visions, living boundaries, and financial outlooks. Only highly compatible candidates who meet Islamic limits are presented to your dashboard." 
         />
         <FAQItem 
-          q="Is Wali Mode mandatory?" 
-          a="No, but it is highly recommended. Wali Mode allows your designated guardian to view match briefs and approve meetings, aligning with traditional Islamic protocols while leveraging modern tech." 
+          q="Is Wali (Guardian) Mode mandatory?" 
+          a="Wali Mode is highly recommended for families wanting traditional involvement. A Wali gets a private dashboard with bilingual match briefs (English/Urdu) and must approve meeting invites before contact details are exchanged." 
         />
         <FAQItem 
-          q="What happens when I block someone?" 
-          a="Blocking is permanent. The other party will not be notified, but their profile will disappear from your Match Pool, and your Twin will instantly terminate any ongoing background negotiations with them." 
+          q="What happens when I file a dispute?" 
+          a="Your report is ingested by our Dispute Agent. We analyze logs from the meeting. Offending parties face permanent bans, and reputation scores are corrected in real-time." 
+        />
+        <FAQItem 
+          q="How does baseline matching compare?" 
+          a="Simple swiping apps match you on basic profile proximity, leading to repetitive discussions on core dealbreakers. RishtaAI uses multi-agent negotiations to find deep compromises (like career vs relocation timelines) before families meet." 
         />
 
+        <View className="h-6" />
       </ScrollView>
     </View>
   );
