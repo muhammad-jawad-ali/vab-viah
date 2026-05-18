@@ -1,173 +1,226 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
-import { DiscoverStackParamList } from '../navigation/types';
-import { DEBATE_MAP, REPORT_MAP, DebateMessage } from '../api/mockData';
+import { useAppStore, DebateMessage } from '../store/useAppStore';
+import { AgTrace } from '../components/AgTrace';
 
-type Props = {
-  navigation: NativeStackNavigationProp<DiscoverStackParamList, 'TwinDebate'>;
-  route: RouteProp<DiscoverStackParamList, 'TwinDebate'>;
-};
-
-const DIMENSIONS = ['Deen', 'Family', 'Career', 'Finances', 'Kids', 'Conflict', 'Geography', 'Boundaries'];
-
-// Animated 3-dot typing indicator
-const TypingIndicator = () => {
-  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
-  useEffect(() => {
-    dots.forEach((dot, i) => {
-      Animated.loop(Animated.sequence([
-        Animated.delay(i * 160),
-        Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(dot, { toValue: 0.2, duration: 300, useNativeDriver: true }),
-        Animated.delay(500),
-      ])).start();
-    });
-  }, []);
-  return (
-    <View className="flex-row items-center gap-1.5 bg-surface border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm self-start mb-4 shadow-sm">
-      {dots.map((dot, i) => (
-        <Animated.View key={i} style={{ opacity: dot, width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' }} />
-      ))}
-    </View>
-  );
-};
-
-// Single debate bubble
-const Bubble = ({ msg, visible }: { msg: DebateMessage; visible: boolean }) => {
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(8)).current;
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.timing(slide, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-  if (!visible) return null;
-
-  const isUser = msg.speaker === 'YourTwin';
-  const isMod = msg.speaker === 'Moderator';
-
-  if (isMod) {
-    return (
-      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }} className="self-center w-full max-w-[88%] mb-4">
-        <View className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl items-center shadow-sm">
-          <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest mb-1">⚖️ Moderator</Text>
-          <Text className="text-emerald-900 text-xs text-center leading-relaxed italic">{msg.text}</Text>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }} className={`mb-4 max-w-[80%] ${isUser ? 'self-end' : 'self-start'}`}>
-      <Text className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${isUser ? 'text-primary text-right' : 'text-slate-500 text-left'}`}>
-        {isUser ? 'Your Twin' : msg.speaker}
-      </Text>
-      <View className={`p-4 rounded-2xl shadow-sm ${isUser ? 'bg-primary border border-primary rounded-tr-sm' : 'bg-surface border border-slate-200 rounded-tl-sm'}`}>
-        <Text className={`text-sm leading-relaxed ${isUser ? 'text-surface' : 'text-slate-800'}`}>"{msg.text}"</Text>
-      </View>
-    </Animated.View>
-  );
-};
-
-export const TwinDebateScreen = ({ navigation, route }: Props) => {
+export const TwinDebateScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const { matchId, matchName } = route.params;
-  const messages: DebateMessage[] = DEBATE_MAP[matchId] ?? DEBATE_MAP['match_001'];
-  const report = REPORT_MAP[matchId] ?? REPORT_MAP['match_001'];
+  const scrollViewRef = useRef<ScrollView>(null);
+  
+  const { matches, currentMatchId, updateMatchStatus } = useAppStore();
+  
+  const candidate = matches.find(m => m.id === currentMatchId) || matches[0];
+  const targetScore = candidate.compatibility;
 
-  const [visibleCount, setVisibleCount] = useState(0);
+  // Custom debate scripts for the three mock candidates
+  const DEBATE_SCRIPTS: Record<string, DebateMessage[]> = {
+    '1': [
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 1: CAREER & EMIGRATION' },
+      { speaker: 'userTwin', text: 'Career growth and psychology practice are foundational to my identity. Relocation is acceptable only if professional parity remains.' },
+      { speaker: 'candidateTwin', text: 'I fully support and value clinical psychology practice. Family ties in Karachi are strong, but I am open to 1-2 years abroad for professional growth.' },
+      { speaker: 'moderator', text: 'VERDICT ROUND 1: Strong alignment (95% compatibility). Compromise mapped for overseas timelines.' },
+      
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 2: FINANCES & ASSETS' },
+      { speaker: 'userTwin', text: 'I believe in maintaining individual savings alongside joint household contribution.' },
+      { speaker: 'candidateTwin', text: 'Fully agreed. Transparent joint account for expenses and separate individual reserves is the healthiest setup.' },
+      { speaker: 'moderator', text: 'VERDICT ROUND 2: Flawless alignment (98% compatibility). Shared reserves model established.' },
+      
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 3: SECT & LIFE VALUES' },
+      { speaker: 'userTwin', text: 'Strictly practicing Sunni values. Respectful household and deen commitments are mandatory.' },
+      { speaker: 'candidateTwin', text: 'I am also Sunni practicing, regularly offering Salah, and prioritizing Islamic education for future kids.' },
+      { speaker: 'moderator', text: 'DEBATE COMPLETED. Overall compatibility score calculated at 94%!' }
+    ],
+    '2': [
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 1: CAREER & EDUCATION' },
+      { speaker: 'userTwin', text: 'Clinical psychology practice is vital for me. I wish to maintain continuous practice.' },
+      { speaker: 'candidateTwin', text: 'Education and local primary teaching is my career path. I fully support professional career choices.' },
+      { speaker: 'moderator', text: 'VERDICT ROUND 1: High alignment (90% compatibility).' },
+      
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 2: FAMILY LIVING SETUP' },
+      { speaker: 'userTwin', text: 'A balanced setup is essential, but I prefer independent lodging if friction arises.' },
+      { speaker: 'candidateTwin', text: 'My family has a joint family setup in Lahore. I prefer staying close to parents to support them.' },
+      { speaker: 'moderator', text: 'VERDICT ROUND 2: Minor friction point detected (80% compatibility). Compromise on separate portion inside home proposed.' },
+      
+      { speaker: 'moderator', text: 'DEBATE COMPLETED. Overall compatibility score calculated at 88%!' }
+    ],
+    '3': [
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 1: CAREER & EMIGRATION' },
+      { speaker: 'userTwin', text: 'Career parity is vital. Relocation abroad is acceptable.' },
+      { speaker: 'candidateTwin', text: 'I am a Chartered Accountant in Islamabad. Strongly settled locally, but open to GCC regions only.' },
+      { speaker: 'moderator', text: 'VERDICT ROUND 1: Moderate alignment (82% compatibility).' },
+      
+      { speaker: 'moderator', text: 'INITIATING DEBATE ROUND 2: CONFLICT STYLE' },
+      { speaker: 'userTwin', text: 'I prefer speaking through issues immediately to prevent emotional distance.' },
+      { speaker: 'candidateTwin', text: 'Under high stress, I prefer giving and receiving space for 2-3 hours before structured talking.' },
+      { speaker: 'moderator', text: 'DEBATE COMPLETED. Overall compatibility score calculated at 82%!' }
+    ]
+  };
+
+  const script = DEBATE_SCRIPTS[candidate.id] || DEBATE_SCRIPTS['1'];
+
+  // State for animated streaming
+  const [messages, setMessages] = useState<DebateMessage[]>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
-  const [dimIndex, setDimIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
+  const [score, setScore] = useState(50);
+  const [debateFinished, setDebateFinished] = useState(false);
 
+  // Set candidate status to negotiating
   useEffect(() => {
-    let cancelled = false;
-    const reveal = async (i: number) => {
-      if (i >= messages.length || cancelled) return;
-      setIsTyping(true);
-      await new Promise((r) => setTimeout(r, 850 + Math.random() * 700));
-      if (cancelled) return;
-      setIsTyping(false);
-      setVisibleCount(i + 1);
-      const msg = messages[i];
-      if (msg.dimension) {
-        const di = DIMENSIONS.findIndex((d) => d.toLowerCase() === msg.dimension);
-        if (di >= 0) setDimIndex(di);
-      }
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-      await new Promise((r) => setTimeout(r, 550));
-      reveal(i + 1);
-    };
-    reveal(0);
-    return () => { cancelled = true; };
-  }, [matchId]);
+    updateMatchStatus(candidate.id, 'negotiating');
+  }, [candidate.id]);
 
-  const isDone = visibleCount >= messages.length;
-  const liveScore = Math.round((visibleCount / messages.length) * report.overallScore);
-  const rec = report.recommendation;
+  // Simulate turn-by-turn debate
+  useEffect(() => {
+    if (currentIdx >= script.length) {
+      setDebateFinished(true);
+      updateMatchStatus(candidate.id, 'revealed');
+      return;
+    }
+
+    const nextMessage = script[currentIdx];
+    const isMod = nextMessage.speaker === 'moderator';
+
+    // Set active speaker for indicator
+    setCurrentSpeaker(
+      nextMessage.speaker === 'userTwin' 
+        ? 'Your Twin' 
+        : nextMessage.speaker === 'candidateTwin' 
+        ? `${candidate.name.split(' ')[0]}'s Twin` 
+        : 'Moderator'
+    );
+
+    setIsTyping(true);
+
+    const delay = isMod ? 1000 : 3000;
+    const timer = setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => [...prev, nextMessage]);
+      
+      // Animate score upwards
+      const newScore = 50 + Math.round(((targetScore - 50) / script.length) * (currentIdx + 1));
+      setScore(Math.min(newScore, targetScore));
+      
+      setCurrentIdx(currentIdx + 1);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [currentIdx, script]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages, isTyping]);
 
   return (
-    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
-      {/* AG-Trace */}
-      <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#059669', marginRight: 8 }} />
-        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1" numberOfLines={1}>
-          AG-TRACE // MODERATOR: DIM {dimIndex + 1}/8 — {DIMENSIONS[dimIndex].toUpperCase()} · LIVE DEBATE ACTIVE
-        </Text>
-      </View>
-
-      {/* Header bar */}
-      <View className="px-5 py-3 border-b border-slate-200/80 bg-background">
-        <View className="flex-row items-center justify-between mb-2.5">
-          <View>
-            <Text className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">Twin Negotiation</Text>
-            <Text className="text-slate-900 font-serif font-bold text-lg">{matchName}</Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-slate-400 text-[9px] uppercase tracking-widest font-bold">Live Compat.</Text>
-            <Text className="text-primary font-bold text-2xl font-mono">{liveScore}%</Text>
-          </View>
+    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-[#020617]">
+      <AgTrace 
+        msg={
+          debateFinished 
+            ? "MODERATOR: VALUE CONVERGENCE SECURED. REPORT FORGED." 
+            : isTyping 
+            ? `${nextTracePrefix(script[currentIdx]?.speaker)}: GENERATING COMPATIBILITY HYPOTHESIS...` 
+            : "MODERATOR: COMPILING MULTI-STAGE DEBATE LOGS..."
+        } 
+      />
+      
+      {/* Live Header Info */}
+      <View className="px-6 py-5 flex-row justify-between items-center border-b border-white/5 bg-[#090d23]">
+        <View>
+          <Text className="text-amber-500 font-bold text-[8px] uppercase tracking-[0.25em] mb-1">Deep Twin Negotiation</Text>
+          <Text className="text-white font-serif text-xl font-bold">{candidate.name.split(' ')[0]} vs. You</Text>
         </View>
-        {/* Dimension pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row gap-2">
-            {DIMENSIONS.map((dim, i) => (
-              <View key={dim} className={`px-2.5 py-1 rounded-full border ${i === dimIndex ? 'bg-primary border-primary shadow-sm' : i < dimIndex ? 'bg-primary/5 border-primary/20' : 'border-slate-200 bg-surface'}`}>
-                <Text className={`text-[9px] font-bold uppercase tracking-wider ${i === dimIndex ? 'text-surface' : i < dimIndex ? 'text-primary' : 'text-slate-400'}`}>{dim}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+        <View className="items-end bg-emerald-950 px-4 py-2.5 rounded-2xl border border-emerald-900/60 shadow-lg shadow-emerald-950/40">
+          <Text className="text-emerald-400 font-serif font-bold text-2.5xl">{score}%</Text>
+          <Text className="text-emerald-500 font-mono text-[7px] uppercase tracking-widest font-bold mt-0.5">COMPATIBILITY</Text>
+        </View>
       </View>
 
-      {/* Messages */}
-      <ScrollView ref={scrollRef} className="flex-1 px-4" contentContainerStyle={{ paddingVertical: 16 }} showsVerticalScrollIndicator={false}>
-        {messages.map((msg, i) => <Bubble key={i} msg={msg} visible={i < visibleCount} />)}
-        {isTyping && <TypingIndicator />}
-      </ScrollView>
-
-      {/* Done CTA */}
-      {isDone && (
-        <View className="px-5 pb-6 pt-3 border-t border-slate-200/80 bg-background">
-          <View className={`p-3 rounded-xl mb-3 border ${rec === 'strong_match' ? 'bg-emerald-50 border-emerald-100' : rec === 'conditional_match' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-100'}`}>
-            <Text className={`font-bold text-[10px] uppercase tracking-widest text-center ${rec === 'strong_match' ? 'text-emerald-800' : rec === 'conditional_match' ? 'text-amber-800' : 'text-rose-800'}`}>
-              {rec === 'strong_match' ? '✅ Strong Match — Proceed to Reveal' : rec === 'conditional_match' ? '⚠️ Conditional Match — Review Report' : '❌ Dealbreaker Found — Not Recommended'}
+      {/* Debate Chat Area */}
+      <ScrollView 
+        ref={scrollViewRef}
+        className="flex-1 px-6 py-4"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="py-2">
+          <View className="bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-6 items-center">
+            <Text className="text-amber-500 text-[10px] font-mono uppercase tracking-[0.15em] mb-1">System Notice</Text>
+            <Text className="text-slate-400 text-xs text-center leading-relaxed font-serif italic">
+              "Bismillah. Both AI Twins have loaded their values, career outlooks, and deen preferences. The Moderator Agent is starting value negotiation."
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('CompatibilityReport', { matchId, matchName, overallScore: report.overallScore })}
-            className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/20"
-          >
-            <Text className="text-surface font-bold text-xs tracking-widest uppercase">View Full Compatibility Report</Text>
-          </TouchableOpacity>
+
+          {messages.map((log, index) => {
+            const isMod = log.speaker === 'moderator';
+            const isUser = log.speaker === 'userTwin';
+            const name = isUser ? 'Your Twin' : `${candidate.name.split(' ')[0]}'s Twin`;
+
+            return (
+              <View 
+                key={index} 
+                className={`mb-5 max-w-[85%] ${isUser ? 'self-end' : isMod ? 'self-center w-full max-w-full' : 'self-start'}`}
+              >
+                {isMod ? (
+                  <View className="bg-amber-500/5 border border-amber-500/20 px-5 py-3 rounded-2xl items-center my-2">
+                    <Text className="text-amber-400 font-mono text-[9px] uppercase tracking-[0.1em] font-bold text-center">
+                      🛡️ {log.text}
+                    </Text>
+                  </View>
+                ) : (
+                  <View>
+                    <Text className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isUser ? 'text-emerald-400 text-right mr-1' : 'text-slate-400 text-left ml-1'}`}>
+                      {name}
+                    </Text>
+                    <View className={`p-4 rounded-2.5xl shadow-sm ${isUser ? 'bg-emerald-900/90 border border-emerald-800/40 rounded-tr-xs' : 'bg-slate-900 border border-slate-800 rounded-tl-xs'}`}>
+                      <Text className="text-white font-serif text-[13.5px] leading-relaxed">
+                        "{log.text}"
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Typing Indicator */}
+          {isTyping && currentSpeaker && (
+            <View className={`mb-5 max-w-[85%] ${currentIdx < script.length && script[currentIdx].speaker === 'userTwin' ? 'self-end' : script[currentIdx].speaker === 'moderator' ? 'self-center' : 'self-start'}`}>
+              <View className="flex-row items-center gap-2 px-4 py-3 bg-slate-900/50 rounded-2xl border border-slate-800/40">
+                <ActivityIndicator size="small" color="#d97706" />
+                <Text className="text-slate-400 font-mono text-[9px] uppercase tracking-wider">
+                  {currentSpeaker} is responding...
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
-      )}
+        <View className="h-6" />
+      </ScrollView>
+
+      {/* Bottom CTA Action */}
+      <View className="p-5 bg-[#090d23] border-t border-white/5">
+        <TouchableOpacity 
+          disabled={!debateFinished}
+          onPress={() => navigation.navigate('CompatibilityReport')}
+          className={`py-4.5 rounded-2xl items-center shadow-lg ${debateFinished ? 'bg-amber-500 shadow-amber-500/10' : 'bg-slate-800 opacity-60'}`}
+        >
+          <Text className={`font-bold text-xs tracking-widest uppercase ${debateFinished ? 'text-emerald-950' : 'text-slate-500'}`}>
+            {debateFinished ? 'Analyze Full Verdict Report ➔' : 'AI Debate in Progress...'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
+
+// Helper function to extract trace prefix matching our backend
+function nextTracePrefix(speaker: string | undefined): string {
+  if (!speaker) return "MODERATOR";
+  if (speaker === 'userTwin') return "USER_TWIN";
+  if (speaker === 'candidateTwin') return "CANDIDATE_TWIN";
+  return "MODERATOR";
+}

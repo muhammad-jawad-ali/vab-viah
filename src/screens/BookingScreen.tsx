@@ -1,143 +1,124 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
-import { MeetingStackParamList } from '../navigation/types';
-import { MOCK_SLOTS } from '../api/mockData';
+import { useAppStore } from '../store/useAppStore';
+import { AgTrace } from '../components/AgTrace';
 
-type Props = {
-  navigation: NativeStackNavigationProp<MeetingStackParamList, 'Booking'>;
-  route: RouteProp<MeetingStackParamList, 'Booking'>;
-};
-
-export const BookingScreen = ({ navigation, route }: Props) => {
+export const BookingScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const { matchId, matchName } = route.params || {};
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  const { matches, currentMatchId, user } = useAppStore();
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<number | null>(null);
 
-  const handleConfirm = () => {
-    if (!selectedSlot || !matchId) return;
-    setConfirmed(true);
-    const slot = MOCK_SLOTS.find((s) => s.slotId === selectedSlot);
-    Alert.alert(
-      '📅 Meeting Confirmed',
-      `Your meeting with ${matchName} has been scheduled for ${slot?.displayDay} at ${slot?.displayTime}. Both Walis have been notified via SMS.`,
-      [{
-        text: 'View Meeting',
-        onPress: () =>
-          navigation.navigate('VideoMeeting', {
-            meetingId: `meet_${matchId}`,
-            meetingUrl: `https://labviah.app/meet/${matchId}`,
-            matchName: matchName || '',
-          }),
-      }]
-    );
+  const candidate = matches.find(m => m.id === currentMatchId) || matches[0];
+  const userCity = user?.city || 'Lahore';
+
+  const slots = [
+    { id: 1, day: 'Saturday', date: 'May 23', time: '02:00 PM', type: 'Virtual Halal Meet' },
+    { id: 2, day: 'Sunday', date: 'May 24', time: '04:00 PM', type: 'In-Person Family Cafe Meet' },
+  ];
+
+  // Places API Mock venues by city
+  const venueData: Record<string, { id: number; name: string; desc: string; address: string; image: string }[]> = {
+    'Lahore': [
+      { id: 1, name: "Butler's Chocolate Cafe", desc: "Cozy, quiet family layout. Wali Approved.", address: "Block Z, DHA Phase 5, Lahore", image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=150&q=80" },
+      { id: 2, name: "Gloria Jean's Coffees", desc: "Open-plan, respectful meeting spot.", address: "Kasuri Road, Gulberg III, Lahore", image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=150&q=80" }
+    ],
+    'Karachi': [
+      { id: 1, name: "Lal's Patisserie", desc: "Upscale, family-friendly sitting areas.", address: "Shahbaz Commercial Area, Phase 6, DHA, Karachi", image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=150&q=80" },
+      { id: 2, name: "Koel Cafe", desc: "Artistic, extremely quiet and respectful garden cafe.", address: "Off Khayaban-e-Hafiz, Phase 8, DHA, Karachi", image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=150&q=80" }
+    ],
+    'Islamabad': [
+      { id: 1, name: "Tuscany Courtyard", desc: "Scenic outdoor terrace, family seating.", address: "Kohsar Market, F-6, Islamabad", image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=150&q=80" },
+      { id: 2, name: "Street 1 Cafe", desc: "Prestigious, well-spaced tables for privacy.", address: "Diplomatic Enclave, G-5, Islamabad", image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=150&q=80" }
+    ]
   };
 
-  if (!matchId) {
-    return (
-      <View style={{ paddingTop: insets.top }} className="flex-1 bg-background justify-center items-center px-8">
-        <View className="w-20 h-20 bg-primary/5 rounded-full items-center justify-center mb-6 border border-primary/10">
-          <Text className="text-4xl text-primary">📅</Text>
-        </View>
-        <Text className="text-2xl font-serif font-bold text-slate-900 text-center mb-2">No Active Booking</Text>
-        <Text className="text-slate-500 text-sm text-center mb-8 leading-relaxed">
-          Select a profile from your Match Pool, initiate a Halal Reveal, and schedule your moderator-guided conversation.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('DiscoverTab' as any)}
-          className="bg-primary px-8 py-4 rounded-xl shadow-lg shadow-primary/20"
-        >
-          <Text className="text-surface font-bold text-xs tracking-widest uppercase">Explore Matches ➔</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const venues = venueData[userCity] || venueData['Lahore'];
 
   return (
-    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
-      {/* AG-Trace */}
-      <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
-        <View className="w-2 h-2 rounded-full bg-emerald-600 mr-2" />
-        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1">
-          AG-TRACE // BOOKING AGENT: HALAL VENUES IDENTIFIED · WALIS NOTIFIED · SLOTS GENERATED
-        </Text>
-      </View>
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="mt-2 mb-6">
-          <Text className="text-primary font-bold text-[10px] uppercase tracking-[0.25em] mb-1">Halal Reveal Confirmed</Text>
-          <Text className="text-slate-900 font-serif text-3xl font-bold">Schedule Meeting</Text>
-          <Text className="text-slate-500 text-sm mt-1">with {matchName}</Text>
+    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-slate-50">
+      <AgTrace msg="BOOKING_AGENT: CALLING PLACES API FOR FAMILY-APPROVED VENUES..." />
+      
+      <ScrollView className="p-6" showsVerticalScrollIndicator={false}>
+        
+        <View className="mb-6 mt-4 border-b border-slate-100 pb-5">
+          <Text className="text-amber-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Mutual Consent Secured</Text>
+          <Text className="text-3.5xl font-serif font-bold text-slate-900 leading-tight">Schedule Meeting</Text>
+          <Text className="text-slate-400 text-xs mt-1">Connecting families respectfully in secure settings.</Text>
         </View>
 
-        {/* Wali status */}
-        <View className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-6 flex-row items-center">
-          <View className="w-3 h-3 rounded-full bg-emerald-500 mr-3" />
-          <Text className="text-emerald-800 font-semibold text-sm flex-1">
-            Both Walis have reviewed the rishta brief and approved contact.
-          </Text>
+        {/* Wali Approval Status banner */}
+        <View className="bg-emerald-950 p-5 rounded-[24px] mb-6 shadow-md border border-emerald-900">
+          <Text className="text-amber-500 font-bold text-[9px] uppercase tracking-widest mb-1.5 font-mono">Wali Approval Secured</Text>
+          <View className="flex-row items-start">
+            <Text className="text-lg mr-2.5">✅</Text>
+            <Text className="text-emerald-50 font-serif text-[12.5px] leading-relaxed flex-1">
+              "Both your Wali and {candidate.name.split(' ')[0]}'s Wali have read the compatibility report and consented to slot booking."
+            </Text>
+          </View>
         </View>
 
-        {/* Slots */}
-        <Text className="text-slate-800 font-serif text-lg font-bold mb-3">Proposed Slots</Text>
-        {MOCK_SLOTS.map((slot) => {
-          const isSelected = selectedSlot === slot.slotId;
-          return (
-            <TouchableOpacity
-              key={slot.slotId}
-              onPress={() => setSelectedSlot(slot.slotId)}
-              className={`rounded-2xl p-5 mb-4 border ${
-                isSelected
-                  ? 'bg-primary/5 border-primary shadow-sm'
-                  : 'bg-surface border-slate-200 shadow-sm'
-              }`}
-            >
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className={`font-bold text-base ${isSelected ? 'text-primary' : 'text-slate-800'}`}>
-                  {slot.displayDay}
-                </Text>
-                <Text className={`font-mono font-bold text-sm ${isSelected ? 'text-primary-light' : 'text-slate-500'}`}>
-                  {slot.displayTime}
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <View className={`px-2 py-0.5 rounded-md mr-2 ${slot.type === 'Virtual' ? 'bg-blue-50 border border-blue-100' : 'bg-purple-50 border border-purple-100'}`}>
-                  <Text className={`text-[9px] font-bold uppercase ${slot.type === 'Virtual' ? 'text-blue-600' : 'text-purple-600'}`}>
-                    {slot.type}
-                  </Text>
-                </View>
-                {slot.location && (
-                  <Text className="text-slate-500 text-xs">📍 {slot.location}</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        {/* Proposed Slots section */}
+        <Text className="text-slate-800 font-serif text-lg font-bold mb-4">1. Select a Time Slot</Text>
+        
+        {slots.map(slot => (
+          <TouchableOpacity 
+            key={slot.id}
+            onPress={() => setSelectedSlot(slot.id)}
+            className={`p-5 rounded-[22px] mb-4 border-2 ${selectedSlot === slot.id ? 'bg-emerald-800/5 border-emerald-800' : 'bg-white border-slate-100 shadow-sm'}`}
+          >
+            <View className="flex-row justify-between items-center mb-1">
+              <Text className={`font-bold text-[15px] ${selectedSlot === slot.id ? 'text-emerald-800' : 'text-slate-800'}`}>
+                {slot.day}, {slot.date}
+              </Text>
+              <Text className={`font-mono font-bold text-xs ${selectedSlot === slot.id ? 'text-amber-600' : 'text-emerald-700'}`}>
+                {slot.time}
+              </Text>
+            </View>
+            <Text className={`text-[12px] mt-1 ${selectedSlot === slot.id ? 'text-emerald-950 font-medium' : 'text-slate-500'}`}>
+              {slot.type}
+            </Text>
+          </TouchableOpacity>
+        ))}
 
-        {/* Mock SMS Preview */}
-        <View className="bg-surface border border-slate-200 rounded-2xl p-4 mb-6 shadow-sm">
-          <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mb-2">📱 SMS Preview (Mock)</Text>
-          <Text className="text-slate-600 text-xs italic leading-relaxed">
-            "Assalamu Alaykum, your rishta meeting with {matchName} has been confirmed. Venue: {selectedSlot ? MOCK_SLOTS.find(s => s.slotId === selectedSlot)?.location ?? 'Virtual' : 'TBD'}. Please confirm attendance — Lab Viah"
-          </Text>
+        {/* Proposed Venues section */}
+        <View className="mt-4 mb-2 flex-row justify-between items-center">
+          <Text className="text-slate-800 font-serif text-lg font-bold">2. Select a Wali-Approved Venue</Text>
+          <Text className="text-emerald-700 font-mono text-[9px] uppercase tracking-widest font-bold">Maps API Fallback</Text>
         </View>
 
-        <TouchableOpacity
-          disabled={!selectedSlot}
-          onPress={handleConfirm}
-          className={`py-5 rounded-2xl items-center shadow-md ${selectedSlot ? 'bg-primary shadow-primary/10' : 'bg-slate-200'}`}
+        {venues.map(venue => (
+          <TouchableOpacity 
+            key={venue.id}
+            onPress={() => setSelectedVenue(venue.id)}
+            className={`p-4 rounded-[22px] mb-4 border-2 flex-row items-center ${selectedVenue === venue.id ? 'bg-emerald-800/5 border-emerald-800' : 'bg-white border-slate-100 shadow-sm'}`}
+          >
+            <View className="w-14 h-14 rounded-xl overflow-hidden mr-4 bg-slate-100">
+              <Image source={{ uri: venue.image }} className="w-full h-full" />
+            </View>
+            <View className="flex-1 pr-2">
+              <Text className={`font-bold text-[14px] ${selectedVenue === venue.id ? 'text-emerald-800' : 'text-slate-800'}`}>
+                {venue.name}
+              </Text>
+              <Text className="text-slate-400 text-[10px] mt-0.5">{venue.address}</Text>
+              <Text className={`text-[10px] font-serif font-bold italic mt-1 ${selectedVenue === venue.id ? 'text-emerald-950' : 'text-amber-600'}`}>
+                {venue.desc}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity 
+          disabled={!selectedSlot || !selectedVenue}
+          onPress={() => navigation.navigate('VideoMeeting')}
+          className={`py-5 rounded-2xl items-center mt-6 mb-12 shadow-xl ${selectedSlot && selectedVenue ? 'bg-amber-500 shadow-amber-500/10' : 'bg-slate-200'}`}
         >
-          <Text className={`font-bold text-xs tracking-widest uppercase ${selectedSlot ? 'text-surface' : 'text-slate-400'}`}>
-            Confirm Booking
+          <Text className={`font-bold text-sm tracking-widest uppercase ${selectedSlot && selectedVenue ? 'text-emerald-950' : 'text-slate-400'}`}>
+            Confirm Booking & Launch Call ➔
           </Text>
         </TouchableOpacity>
+
       </ScrollView>
     </View>
   );

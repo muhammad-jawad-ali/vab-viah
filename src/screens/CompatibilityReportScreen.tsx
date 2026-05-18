@@ -1,147 +1,122 @@
-import React, { useRef, useEffect } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, Animated, Easing,
-} from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
-import { DiscoverStackParamList } from '../navigation/types';
-import { REPORT_MAP } from '../api/mockData';
+import { useAppStore } from '../store/useAppStore';
+import { AgTrace } from '../components/AgTrace';
 
-type Props = {
-  navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
-  route: RouteProp<DiscoverStackParamList, 'CompatibilityReport'>;
-};
-
-const DimensionBar = ({ label, score, delay }: { label: string; score: number; delay: number }) => {
-  const width = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(width, {
-      toValue: score,
-      duration: 800,
-      delay,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, []);
-
-  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
-
-  return (
-    <View className="mb-5">
-      <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-slate-300 font-bold text-xs uppercase tracking-wider">{label}</Text>
-        <Text style={{ color }} className="font-mono font-bold text-sm">{score}%</Text>
-      </View>
-      <View className="h-2 bg-slate-800 rounded-full overflow-hidden">
-        <Animated.View
-          style={{ width: width.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }), backgroundColor: color }}
-          className="h-full rounded-full"
-        />
-      </View>
+const Dim = ({ label, score }: { label: string; score: number }) => (
+  <View className="w-[48%] mb-5">
+    <View className="flex-row justify-between items-end mb-1.5">
+      <Text className="font-bold text-slate-600 text-[10px] uppercase tracking-wider">{label}</Text>
+      <Text className="font-mono text-emerald-800 font-bold text-[11px]">{score}%</Text>
     </View>
-  );
-};
+    <View className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <View style={{ width: `${score}%` }} className="h-full bg-emerald-800" />
+    </View>
+  </View>
+);
 
-export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
+export const CompatibilityReportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const { matchId, matchName, overallScore } = route.params;
-  const report = REPORT_MAP[matchId] ?? REPORT_MAP['match_002'];
+  const { matches, currentMatchId } = useAppStore();
 
-  const scoreAnim = useRef(new Animated.Value(0)).current;
-  const displayScore = useRef(0);
-  scoreAnim.addListener(({ value }) => { displayScore.current = Math.round(value); });
+  const candidate = matches.find(m => m.id === currentMatchId) || matches[0];
 
-  useEffect(() => {
-    Animated.timing(scoreAnim, {
-      toValue: report.overallScore,
-      duration: 1200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, []);
+  // Dynamic values based on selected candidate
+  const reportData: Record<string, {
+    dimensions: Record<string, number>;
+    friction: string;
+    baselineScore: number;
+    baselineExplanation: string;
+  }> = {
+    '1': {
+      dimensions: { Deen: 98, Family: 90, Career: 95, Finances: 92, Kids: 88, Conflict: 95, Geography: 85, Boundaries: 94 },
+      friction: "Geography & Local Roots. Bilal resides in Karachi while you are in Lahore. In a flat matching system, this is flagged as a direct relocation conflict. However, during Twin debate, Bilal's twin agreed to a 2-year timeline of Lahore-based hybrid working to fully support your clinical practice.",
+      baselineScore: 71,
+      baselineExplanation: "Static distance algorithms penalized their differing cities and career ambitions as mismatched, missing the cooperative 2-year relocation compromise negotiated by the AI Twins."
+    },
+    '2': {
+      dimensions: { Deen: 88, Family: 82, Career: 90, Finances: 86, Kids: 85, Conflict: 80, Geography: 94, Boundaries: 88 },
+      friction: "Joint Family Living. Zainab prefers staying close to her parents in Lahore. Our Twin debate negotiated a comfortable middle ground where Zainab's family allocates a fully private upper portion of the house with a separate entrance to secure your independent living preference.",
+      baselineScore: 65,
+      baselineExplanation: "Standard heuristics flagged joint family preference as a dealbreaker, failing to negotiate the physical boundaries and separate upper-portion compromise established in the debate."
+    },
+    '3': {
+      dimensions: { Deen: 82, Family: 80, Career: 85, Finances: 88, Kids: 82, Conflict: 78, Geography: 90, Boundaries: 80 },
+      friction: "Conflict Styles & Resolution. Hamza's twin indicated a high preference for cool-off periods (2-3 hours) during friction, whereas you seek immediate resolution. The Twins agreed to a structured '1-hour pause' guideline to prevent emotional distance.",
+      baselineScore: 84,
+      baselineExplanation: "Artificially high score. Static heuristics matched them heavily based on high financial and local city parity, completely blind to the significant emotional and conflict style divergence highlighted during Twin negotiations."
+    }
+  };
 
-  const rec = report.recommendation;
-  const recColor = rec === 'strong_match' ? '#10b981' : rec === 'conditional_match' ? '#f59e0b' : '#ef4444';
-  const recLabel = rec === 'strong_match' ? '✅ Strong Match' : rec === 'conditional_match' ? '⚠️ Conditional Match' : '❌ Not Recommended';
-
-  const DIMS: Array<keyof typeof report.dimensions> = ['deen','family','career','finances','kids','conflict','geography','boundaries'];
-  const DIM_LABELS: Record<string, string> = { deen:'Deen', family:'Family', career:'Career', finances:'Finances', kids:'Kids', conflict:'Conflict', geography:'Geography', boundaries:'Boundaries' };
+  const currentReport = reportData[candidate.id] || reportData['1'];
 
   return (
-    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
-      {/* AG-Trace */}
-      <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
-        <View className="w-2 h-2 rounded-full bg-emerald-600 mr-2" />
-        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1" numberOfLines={1}>
-          AG-TRACE // MODERATOR: REPORT GENERATED · 8-DIM ANALYSIS COMPLETE · REASONING LOGGED
-        </Text>
-      </View>
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Overall score hero */}
-        <View className="items-center my-6">
-          <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mb-1">Compatibility Report</Text>
-          <Text className="text-slate-900 font-serif text-2xl font-bold mb-4">{matchName}</Text>
-          <View className="w-32 h-32 rounded-full bg-emerald-50 border-4 border-emerald-600/30 items-center justify-center mb-4">
-            <Animated.Text className="text-emerald-800 font-bold text-4xl">
-              {report.overallScore}%
-            </Animated.Text>
-          </View>
-          <View style={{ backgroundColor: recColor + '20', borderColor: recColor + '60' }} className="px-4 py-1.5 rounded-full border">
-            <Text style={{ color: recColor }} className="font-bold text-xs">{recLabel}</Text>
+    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-slate-50">
+      <AgTrace msg="MODERATOR_AGENT: FORGING COMPATIBILITY VERDICT REPORT V1.0..." />
+      
+      <ScrollView className="p-6" showsVerticalScrollIndicator={false}>
+        
+        {/* Header Block */}
+        <View className="items-center mb-8 mt-4">
+          <Text className="text-amber-600 font-bold text-[10px] uppercase tracking-[0.3em] mb-1">Moderator Verdict</Text>
+          <Text className="text-3.5xl font-serif font-bold text-slate-900 mb-3">{candidate.name}</Text>
+          
+          <View className="bg-emerald-800 px-6 py-2.5 rounded-2xl shadow-md shadow-emerald-800/10">
+            <Text className="text-white font-bold text-sm tracking-widest uppercase">{candidate.compatibility}% Compatible</Text>
           </View>
         </View>
 
-        {/* 8-Dimension Breakdown */}
-        <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-5">
-          <Text className="text-slate-800 font-serif text-base font-bold mb-5">8-Dimension Breakdown</Text>
-          {DIMS.map((dim, i) => (
-            <DimensionBar key={dim} label={DIM_LABELS[dim]} score={report.dimensions[dim]} delay={i * 80} />
-          ))}
+        {/* 8-Dimension breakdown */}
+        <View className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 mb-5">
+          <Text className="text-slate-900 font-serif text-lg font-bold mb-5">8-Dimension Value Audit</Text>
+          <View className="flex-row flex-wrap justify-between">
+            {Object.entries(currentReport.dimensions).map(([label, score]) => (
+              <Dim key={label} label={label} score={score} />
+            ))}
+          </View>
         </View>
 
-        {/* Top Strengths */}
-        <View className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-4 shadow-sm">
-          <Text className="text-emerald-800 font-bold text-xs uppercase tracking-widest mb-3">Top Strengths</Text>
-          {report.topStrengths.map((s, i) => (
-            <View key={i} className="flex-row items-start mb-2">
-              <Text className="text-emerald-700 mr-2 text-sm">✓</Text>
-              <Text className="text-emerald-800/80 text-sm flex-1">{s}</Text>
+        {/* Dynamic Negotiated Friction Point */}
+        <View className="bg-emerald-950 p-5 rounded-[28px] shadow-md mb-5 border border-emerald-900">
+          <Text className="text-amber-500 font-bold text-[9px] uppercase tracking-[0.2em] mb-2">Negotiated Agreement</Text>
+          <Text className="text-emerald-50 font-serif text-sm leading-relaxed italic">
+            "{currentReport.friction}"
+          </Text>
+        </View>
+
+        {/* Baseline Comparison Card (Core Hackathon Requirement) */}
+        <View className="bg-white p-5 rounded-[28px] shadow-sm border-2 border-amber-500/20 mb-8 bg-amber-500/5">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-amber-800 font-bold text-[10px] uppercase tracking-[0.15em]">📊 Heuristic Baseline Comparison</Text>
+            <View className="bg-amber-100 px-2.5 py-0.5 rounded-full"><Text className="text-amber-800 font-bold text-[9px]">COMPARED</Text></View>
+          </View>
+          
+          <View className="flex-row justify-between items-center mb-4">
+            <View className="items-center bg-slate-100 p-3 rounded-xl flex-1 mr-3 border border-slate-200">
+              <Text className="text-slate-400 font-mono text-[9px] uppercase font-bold tracking-wider">Static Baseline</Text>
+              <Text className="text-slate-600 font-serif text-2xl font-bold mt-1">{currentReport.baselineScore}%</Text>
             </View>
-          ))}
+            <View className="items-center bg-emerald-900 p-3 rounded-xl flex-1 border border-emerald-800">
+              <Text className="text-emerald-400 font-mono text-[9px] uppercase font-bold tracking-wider">RishtaAI (Agentic)</Text>
+              <Text className="text-white font-serif text-2xl font-bold mt-1">{candidate.compatibility}%</Text>
+            </View>
+          </View>
+          
+          <Text className="text-slate-600 text-xs leading-relaxed">
+            <Text className="font-bold text-slate-800">Why Agentic wins: </Text>
+            {currentReport.baselineExplanation}
+          </Text>
         </View>
 
-        {/* Friction Point */}
-        <View className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 shadow-sm">
-          <Text className="text-amber-800 font-bold text-xs uppercase tracking-widest mb-2">
-            {rec === 'not_recommended' ? '🚫 Dealbreaker' : '⚠️ Friction Point'}
-          </Text>
-          <Text className="text-amber-800/80 text-sm leading-relaxed italic">
-            "{report.frictionPoint}"
-          </Text>
-        </View>
-
-        {/* CTAs */}
-        {rec !== 'not_recommended' && (
-          <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('MeetingsTab', { screen: 'Booking', params: { matchId, matchName } })}
-            className="bg-primary py-5 rounded-2xl items-center mb-3 shadow-lg shadow-primary/20"
-          >
-            <Text className="text-surface font-bold text-xs tracking-widest uppercase">Initiate Halal Reveal</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={() => navigation.getParent()?.navigate('MeetingsTab', { screen: 'DisputeForm', params: { matchId, matchName } })}
-          className="border border-rose-200 bg-rose-50/50 py-4 rounded-2xl items-center"
+        {/* Action Button */}
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('MeetingsTab', { screen: 'Booking' })}
+          className="bg-amber-500 py-5 rounded-2xl items-center shadow-xl shadow-amber-500/10 mb-10"
         >
-          <Text className="text-rose-700 font-bold text-xs tracking-widest uppercase">Report Issue</Text>
+          <Text className="text-emerald-950 font-bold text-sm tracking-widest uppercase">Initiate Wali-to-Wali Reveal ➔</Text>
         </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
