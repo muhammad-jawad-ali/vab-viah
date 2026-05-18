@@ -1,173 +1,490 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Animated, Easing } from 'react-native';
+// TwinDebateScreen — live phased visualization of a find_matches workplan.
+//
+// Inputs (route params): flowId, candidateTwinId, displayName.
+//
+// What the user sees:
+//   1. Phase rail at the top: Reading profiles → Debating dimensions →
+//      Reaching verdict → Final report. Active phase highlights as
+//      task.started events flow in.
+//   2. Live dimension grid: 8 cells (one per dimension). Each cell fills with
+//      a signed score bar (-1..1) when its `dimension.scored` event arrives.
+//      Only scores for the user's specific debate (this candidate) matter for
+//      display, but the workplan emits 5 parallel debates; we filter by
+//      observation messages containing the displayName as a heuristic and
+//      otherwise show *latest* per dim.
+//   3. Decision bubbles: typewriter-reveal text rendered in batches as
+//      agent.decision events arrive. Anchored to the bottom so the most
+//      recent decision is always visible.
+//   4. Verdict CTA: when workplan.finished arrives, a celebratory button
+//      pushes the user to CompatibilityReport.
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { DiscoverStackParamList } from '../navigation/types';
-import { DEBATE_MAP, REPORT_MAP, DebateMessage } from '../api/mockData';
+import {
+  DIMENSIONS,
+  DIMENSION_LABELS,
+  type Dimension,
+} from '../api/types';
+import {
+  useTraceStream,
+  PHASE_LABEL,
+  PHASE_INDEX,
+  PHASE_TOTAL,
+  type DecisionBubble,
+  type DebatePhase,
+} from '../hooks/useTraceStream';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'TwinDebate'>;
   route: RouteProp<DiscoverStackParamList, 'TwinDebate'>;
 };
 
-const DIMENSIONS = ['Deen', 'Family', 'Career', 'Finances', 'Kids', 'Conflict', 'Geography', 'Boundaries'];
-
-// Animated 3-dot typing indicator
-const TypingIndicator = () => {
-  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
-  useEffect(() => {
-    dots.forEach((dot, i) => {
-      Animated.loop(Animated.sequence([
-        Animated.delay(i * 160),
-        Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(dot, { toValue: 0.2, duration: 300, useNativeDriver: true }),
-        Animated.delay(500),
-      ])).start();
-    });
-  }, []);
-  return (
-    <View className="flex-row items-center gap-1.5 bg-surface border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm self-start mb-4 shadow-sm">
-      {dots.map((dot, i) => (
-        <Animated.View key={i} style={{ opacity: dot, width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' }} />
-      ))}
-    </View>
-  );
-};
-
-// Single debate bubble
-const Bubble = ({ msg, visible }: { msg: DebateMessage; visible: boolean }) => {
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(8)).current;
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.timing(slide, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-  if (!visible) return null;
-
-  const isUser = msg.speaker === 'YourTwin';
-  const isMod = msg.speaker === 'Moderator';
-
-  if (isMod) {
-    return (
-      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }} className="self-center w-full max-w-[88%] mb-4">
-        <View className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl items-center shadow-sm">
-          <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest mb-1">⚖️ Moderator</Text>
-          <Text className="text-emerald-900 text-xs text-center leading-relaxed italic">{msg.text}</Text>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }} className={`mb-4 max-w-[80%] ${isUser ? 'self-end' : 'self-start'}`}>
-      <Text className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${isUser ? 'text-primary text-right' : 'text-slate-500 text-left'}`}>
-        {isUser ? 'Your Twin' : msg.speaker}
-      </Text>
-      <View className={`p-4 rounded-2xl shadow-sm ${isUser ? 'bg-primary border border-primary rounded-tr-sm' : 'bg-surface border border-slate-200 rounded-tl-sm'}`}>
-        <Text className={`text-sm leading-relaxed ${isUser ? 'text-surface' : 'text-slate-800'}`}>"{msg.text}"</Text>
-      </View>
-    </Animated.View>
-  );
-};
+const PHASES: DebatePhase[] = [
+  'reading_profiles',
+  'debating',
+  'ranking',
+  'finished',
+];
 
 export const TwinDebateScreen = ({ navigation, route }: Props) => {
   const insets = useSafeAreaInsets();
-  const { matchId, matchName } = route.params;
-  const messages: DebateMessage[] = DEBATE_MAP[matchId] ?? DEBATE_MAP['match_001'];
-  const report = REPORT_MAP[matchId] ?? REPORT_MAP['match_001'];
-
-  const [visibleCount, setVisibleCount] = useState(0);
-  const [isTyping, setIsTyping] = useState(false);
-  const [dimIndex, setDimIndex] = useState(0);
+  const { flowId, candidateTwinId, displayName } = route.params;
+  const trace = useTraceStream(flowId);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Auto-scroll the decision feed on each new bubble.
   useEffect(() => {
-    let cancelled = false;
-    const reveal = async (i: number) => {
-      if (i >= messages.length || cancelled) return;
-      setIsTyping(true);
-      await new Promise((r) => setTimeout(r, 850 + Math.random() * 700));
-      if (cancelled) return;
-      setIsTyping(false);
-      setVisibleCount(i + 1);
-      const msg = messages[i];
-      if (msg.dimension) {
-        const di = DIMENSIONS.findIndex((d) => d.toLowerCase() === msg.dimension);
-        if (di >= 0) setDimIndex(di);
-      }
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-      await new Promise((r) => setTimeout(r, 550));
-      reveal(i + 1);
-    };
-    reveal(0);
-    return () => { cancelled = true; };
-  }, [matchId]);
+    if (trace.decisions.length === 0) return;
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(t);
+  }, [trace.decisions.length]);
 
-  const isDone = visibleCount >= messages.length;
-  const liveScore = Math.round((visibleCount / messages.length) * report.overallScore);
-  const rec = report.recommendation;
+  const headerStatusLabel =
+    trace.status === 'connecting'
+      ? 'Connecting'
+      : trace.status === 'streaming'
+        ? 'Live'
+        : trace.status === 'finished'
+          ? 'Verdict reached'
+          : 'Stream errored';
 
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
       {/* AG-Trace */}
       <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#059669', marginRight: 8 }} />
-        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1" numberOfLines={1}>
-          AG-TRACE // MODERATOR: DIM {dimIndex + 1}/8 — {DIMENSIONS[dimIndex].toUpperCase()} · LIVE DEBATE ACTIVE
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor:
+              trace.status === 'finished'
+                ? '#059669'
+                : trace.status === 'error'
+                  ? '#dc2626'
+                  : '#f59e0b',
+            marginRight: 8,
+          }}
+        />
+        <Text
+          className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1"
+          numberOfLines={1}
+        >
+          AG-TRACE // FLOW {flowId.slice(0, 18)}… · {trace.events.length} EVENTS
         </Text>
       </View>
 
-      {/* Header bar */}
-      <View className="px-5 py-3 border-b border-slate-200/80 bg-background">
-        <View className="flex-row items-center justify-between mb-2.5">
-          <View>
-            <Text className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">Twin Negotiation</Text>
-            <Text className="text-slate-900 font-serif font-bold text-lg">{matchName}</Text>
+      {/* Header */}
+      <View className="px-5 py-3 border-b border-slate-200/80">
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-1 mr-3">
+            <Text className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">
+              Twin Debate
+            </Text>
+            <Text
+              className="text-slate-900 font-serif font-bold text-lg"
+              numberOfLines={1}
+            >
+              {displayName}
+            </Text>
           </View>
           <View className="items-end">
-            <Text className="text-slate-400 text-[9px] uppercase tracking-widest font-bold">Live Compat.</Text>
-            <Text className="text-primary font-bold text-2xl font-mono">{liveScore}%</Text>
+            <Text className="text-slate-400 text-[9px] uppercase tracking-widest font-bold">
+              Status
+            </Text>
+            <Text
+              className={`font-bold text-xs ${
+                trace.status === 'finished'
+                  ? 'text-emerald-700'
+                  : trace.status === 'error'
+                    ? 'text-rose-600'
+                    : 'text-amber-600'
+              }`}
+            >
+              {headerStatusLabel}
+            </Text>
           </View>
         </View>
-        {/* Dimension pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row gap-2">
-            {DIMENSIONS.map((dim, i) => (
-              <View key={dim} className={`px-2.5 py-1 rounded-full border ${i === dimIndex ? 'bg-primary border-primary shadow-sm' : i < dimIndex ? 'bg-primary/5 border-primary/20' : 'border-slate-200 bg-surface'}`}>
-                <Text className={`text-[9px] font-bold uppercase tracking-wider ${i === dimIndex ? 'text-surface' : i < dimIndex ? 'text-primary' : 'text-slate-400'}`}>{dim}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+
+        <PhaseRail phase={trace.phase} />
       </View>
 
-      {/* Messages */}
-      <ScrollView ref={scrollRef} className="flex-1 px-4" contentContainerStyle={{ paddingVertical: 16 }} showsVerticalScrollIndicator={false}>
-        {messages.map((msg, i) => <Bubble key={i} msg={msg} visible={i < visibleCount} />)}
-        {isTyping && <TypingIndicator />}
+      {/* Body */}
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {trace.status === 'error' ? (
+          <ErrorBlock error={trace.error ?? 'Stream errored'} />
+        ) : null}
+
+        <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mb-3">
+          Dimension Scoreboard
+        </Text>
+        <DimensionGrid scores={trace.dimensionScores} />
+
+        <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-7 mb-3">
+          AI Reasoning Stream
+        </Text>
+        {trace.decisions.length === 0 && trace.observations.length === 0 ? (
+          <View className="bg-surface border border-slate-200 rounded-2xl p-5 items-center">
+            <Text className="text-slate-500 text-xs text-center">
+              Waiting for the workplan to emit its first decision…
+            </Text>
+          </View>
+        ) : (
+          <>
+            {trace.decisions.map((d, i) => (
+              <DecisionCard key={d.id} bubble={d} index={i} />
+            ))}
+            {trace.recoveries.length > 0 ? (
+              <View className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 mt-2">
+                <Text className="text-amber-800 text-[10px] font-bold uppercase tracking-widest mb-1">
+                  ⚠ {trace.recoveries.length} recovery
+                  {trace.recoveries.length === 1 ? '' : 'ies'}
+                </Text>
+                {trace.recoveries.slice(-2).map((r) => (
+                  <Text key={r.id} className="text-amber-800/80 text-[11px] leading-relaxed">
+                    {r.action}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </>
+        )}
+
+        {/* Collapsible tool-call log */}
+        <ToolCallSection toolCalls={trace.toolCalls} />
       </ScrollView>
 
-      {/* Done CTA */}
-      {isDone && (
-        <View className="px-5 pb-6 pt-3 border-t border-slate-200/80 bg-background">
-          <View className={`p-3 rounded-xl mb-3 border ${rec === 'strong_match' ? 'bg-emerald-50 border-emerald-100' : rec === 'conditional_match' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-100'}`}>
-            <Text className={`font-bold text-[10px] uppercase tracking-widest text-center ${rec === 'strong_match' ? 'text-emerald-800' : rec === 'conditional_match' ? 'text-amber-800' : 'text-rose-800'}`}>
-              {rec === 'strong_match' ? '✅ Strong Match — Proceed to Reveal' : rec === 'conditional_match' ? '⚠️ Conditional Match — Review Report' : '❌ Dealbreaker Found — Not Recommended'}
+      {/* Verdict CTA */}
+      {trace.status === 'finished' ? (
+        <View
+          className="px-5 pt-3 border-t border-slate-200/80 bg-background"
+          style={{ paddingBottom: insets.bottom + 16 }}
+        >
+          <View className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
+            <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest text-center">
+              ✓ Verdict reached — {trace.events.length} trace events
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => navigation.navigate('CompatibilityReport', { matchId, matchName, overallScore: report.overallScore })}
+            onPress={() =>
+              navigation.navigate('CompatibilityReport', {
+                flowId,
+                candidateTwinId,
+                displayName,
+              })
+            }
             className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/20"
           >
-            <Text className="text-surface font-bold text-xs tracking-widest uppercase">View Full Compatibility Report</Text>
+            <Text className="text-surface font-bold text-xs tracking-widest uppercase">
+              View Compatibility Report →
+            </Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
     </View>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Phase rail — 4 segments with the active one filled.
+// ---------------------------------------------------------------------------
+
+const PhaseRail = ({ phase }: { phase: DebatePhase }) => {
+  const activeIdx = PHASE_INDEX[phase];
+  return (
+    <View>
+      <View className="flex-row gap-1.5">
+        {PHASES.map((p, i) => {
+          const active = i <= activeIdx - 1;
+          const current = i === activeIdx - 1;
+          return (
+            <View
+              key={p}
+              className={`flex-1 h-1.5 rounded-full ${
+                active
+                  ? current
+                    ? 'bg-primary'
+                    : 'bg-primary/80'
+                  : 'bg-slate-200'
+              }`}
+            />
+          );
+        })}
+      </View>
+      <View className="flex-row justify-between mt-2">
+        <Text
+          className={`text-[10px] font-bold uppercase tracking-widest ${
+            phase === 'error' ? 'text-rose-600' : 'text-primary'
+          }`}
+        >
+          {PHASE_LABEL[phase]}
+        </Text>
+        <Text className="text-slate-400 text-[10px] uppercase tracking-widest">
+          Step {Math.max(1, Math.min(PHASE_TOTAL, activeIdx))}/{PHASE_TOTAL}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Dimension grid — 8 cells, score fills in as events arrive.
+// ---------------------------------------------------------------------------
+
+const DimensionGrid = ({
+  scores,
+}: {
+  scores: Partial<Record<Dimension, { score: number; evidence: string }>>;
+}) => {
+  return (
+    <View className="bg-surface border border-slate-200 rounded-2xl p-4">
+      <View className="flex-row flex-wrap -m-1">
+        {DIMENSIONS.map((dim) => {
+          const entry = scores[dim];
+          return (
+            <View key={dim} className="w-1/2 p-1">
+              <DimensionCell dim={dim} score={entry?.score} evidence={entry?.evidence} />
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+const DimensionCell = ({
+  dim,
+  score,
+  evidence,
+}: {
+  dim: Dimension;
+  score: number | undefined;
+  evidence: string | undefined;
+}) => {
+  // Backend dimension.scored emits score in [-1, 1]. Map to a 0-100% fill for
+  // the bar but keep the sign for tone.
+  const width = useRef(new Animated.Value(0)).current;
+  const targetPct = score === undefined ? 0 : Math.round(Math.abs(score) * 100);
+  const positive = (score ?? 0) >= 0;
+
+  useEffect(() => {
+    if (score === undefined) return;
+    Animated.timing(width, {
+      toValue: targetPct,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [score, targetPct]);
+
+  const fillColor =
+    score === undefined
+      ? '#e2e8f0'
+      : positive
+        ? '#10b981'
+        : '#f97316';
+  const labelColor = score === undefined ? '#94a3b8' : '#0f172a';
+
+  return (
+    <View className="bg-slate-50/60 border border-slate-200/80 rounded-xl px-3 py-2.5">
+      <View className="flex-row justify-between items-center mb-1.5">
+        <Text
+          style={{ color: labelColor }}
+          className="text-[10px] font-bold uppercase tracking-wider"
+        >
+          {DIMENSION_LABELS[dim]}
+        </Text>
+        <Text
+          style={{ color: fillColor }}
+          className="font-mono text-[11px] font-bold"
+        >
+          {score === undefined ? '—' : `${positive ? '+' : '−'}${targetPct}`}
+        </Text>
+      </View>
+      <View className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+        <Animated.View
+          style={{
+            width: width.interpolate({
+              inputRange: [0, 100],
+              outputRange: ['0%', '100%'],
+            }),
+            backgroundColor: fillColor,
+          }}
+          className="h-full rounded-full"
+        />
+      </View>
+      {evidence ? (
+        <Text className="text-slate-500 text-[10px] mt-1.5 leading-tight" numberOfLines={2}>
+          {evidence}
+        </Text>
+      ) : null}
+    </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// DecisionCard — typewriter-reveal bubble for agent.decision events.
+// ---------------------------------------------------------------------------
+
+const DecisionCard = ({
+  bubble,
+  index,
+}: {
+  bubble: DecisionBubble;
+  index: number;
+}) => {
+  const fade = useRef(new Animated.Value(0)).current;
+  const [typed, setTyped] = useState('');
+  const text = bubble.rationale || bubble.decision;
+  const TYPE_INTERVAL = 18; // ms per character — fast but readable
+
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 320,
+      useNativeDriver: true,
+    }).start();
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setTyped(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, TYPE_INTERVAL);
+    return () => clearInterval(id);
+  }, [text]);
+
+  const tone =
+    bubble.agent === 'moderator'
+      ? 'bg-emerald-50 border-emerald-100'
+      : bubble.agent === 'user_twin'
+        ? 'bg-primary/10 border-primary/20'
+        : bubble.agent === 'candidate_twin'
+          ? 'bg-amber-50 border-amber-200'
+          : 'bg-surface border-slate-200';
+
+  return (
+    <Animated.View style={{ opacity: fade }} className={`${tone} border rounded-2xl p-4 mb-3`}>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+          {labelForAgent(bubble.agent)}
+        </Text>
+        <Text className="text-slate-400 text-[9px] font-mono">#{index + 1}</Text>
+      </View>
+      <Text className="text-slate-800 font-bold text-sm mb-1.5 leading-snug">
+        {bubble.decision}
+      </Text>
+      <Text className="text-slate-600 text-xs leading-relaxed">{typed}</Text>
+    </Animated.View>
+  );
+};
+
+function labelForAgent(agent: string): string {
+  switch (agent) {
+    case 'moderator':
+      return '⚖ Moderator';
+    case 'user_twin':
+      return '👤 Your Twin';
+    case 'candidate_twin':
+      return '👥 Their Twin';
+    case 'workplan':
+      return '🧠 Workplan';
+    case 'onboarding':
+      return '✨ Onboarding';
+    default:
+      return agent;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tool call section — collapsed by default to keep the timeline non-noisy.
+// ---------------------------------------------------------------------------
+
+const ToolCallSection = ({
+  toolCalls,
+}: {
+  toolCalls: { id: string; tool: string; args: unknown; ts: number }[];
+}) => {
+  const [open, setOpen] = useState(false);
+  if (toolCalls.length === 0) return null;
+  return (
+    <View className="mt-6">
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        className="flex-row items-center justify-between bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2.5"
+      >
+        <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+          🔧 {toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'}
+        </Text>
+        <Text className="text-slate-500 text-xs">{open ? '▾' : '▸'}</Text>
+      </Pressable>
+      {open ? (
+        <View className="bg-slate-50 border border-t-0 border-slate-200 rounded-b-xl p-3 -mt-1.5">
+          {toolCalls.map((t) => (
+            <View key={t.id} className="mb-2 last:mb-0">
+              <Text className="text-slate-700 text-[11px] font-mono font-bold">
+                {t.tool}
+              </Text>
+              <Text className="text-slate-500 text-[10px] font-mono mt-0.5" numberOfLines={2}>
+                {summarizeArgs(t.args)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+function summarizeArgs(args: unknown): string {
+  try {
+    return typeof args === 'string' ? args : JSON.stringify(args).slice(0, 120);
+  } catch {
+    return '<unserializable>';
+  }
+}
+
+const ErrorBlock = ({ error }: { error: string }) => (
+  <View className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4">
+    <Text className="text-rose-700 font-bold text-[10px] uppercase tracking-widest mb-1">
+      Stream interrupted
+    </Text>
+    <Text className="text-rose-700/80 text-xs leading-relaxed">{error}</Text>
+  </View>
+);
