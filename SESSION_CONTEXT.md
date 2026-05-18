@@ -30,14 +30,14 @@
 
 ## 1. Current status snapshot
 
-- **Project phase:** Session 2 COMPLETE — 4-layer onboarding wired end-to-end against the real backend. Signup → Onboarding(Layer1 chat → Layer2 12 cards → Layer3 statements → Wali (skippable) → Finalize) → Main. Resume-after-kill works via SecureStore-persisted sessionId. Backend types realigned with route handlers (Layer1/2/3/wali/finalize/twin.me all confirmed against `backend/src/routes/*.routes.ts`). Mock data still drives Match/Booking/Wali/Feedback screens — Session 3 onwards.
-- **Frontend repo:** `frontend/vab-viah/` (git remote: `https://github.com/muhammad-jawad-ali/vab-viah.git`). Pushed to branch `integration/session-1-foundation` (Session 2 work landed on the same branch — see Decisions §5).
-- **Backend status:** All 5 backend sessions complete + teammate's deployment polish landed (Node 22 engine, self-healing GCP creds loader, ws polyfill in tests). Backend is **locked**.
+- **Project phase:** Session 3 COMPLETE — match flow wired end-to-end against the real backend. MatchPool POSTs /match/request → subscribes to /stream/:flowId via typed react-native-sse wrapper → fetches /match/results once workplan.finished arrives. Tinder-style swipeable deck (PanResponder, no extra deps) ranks the top 10 debated candidates. TwinDebate renders a phased visualization (Reading profiles → Debating → Reaching verdict → Final report) with a live 8-dimension scoreboard, typewriter-reveal decision bubbles, and a collapsed tool-call log. CompatibilityReport fetches by flowId + candidateTwinId and renders the per-dim breakdown with evidence quotes + friction levels + dealbreaker chips. Mock data still drives Booking/Wali/Feedback/Dispute — Session 4 next.
+- **Frontend repo:** `frontend/vab-viah/` (git remote: `https://github.com/muhammad-jawad-ali/Lab-Viah-Frontend.git` — renamed after Session 2). Pushed to branch `integration/session-1-foundation`.
+- **Backend status:** All 5 backend sessions complete + teammate's deployment polish landed (Node 22 engine, self-healing GCP creds loader, ws polyfill in tests). Backend is **locked**. Session 3 did not touch backend.
 - **Backend dev URL:** `http://localhost:3000` (run `cd backend && npm run dev`).
 - **Backend Railway URL:** *(fill in once user shares)*.
-- **Dev OTP bypass:** `+923001234567` / `0000` against backend dev (DEV_OTP_BYPASS=true). Now also enabled on Railway per backend Session 5 patch — handy for judge testing.
-- **Days until 20 May submission:** ~2 (assume today is 2026-05-18).
-- **Last updated:** 2026-05-18 by Session 2 (onboarding).
+- **Dev OTP bypass:** `+923001234567` / `0000` against backend dev (DEV_OTP_BYPASS=true). Also enabled on Railway per backend Session 5 patch.
+- **Days until 20 May submission:** 1 (today is 2026-05-19).
+- **Last updated:** 2026-05-19 by Session 3 (match + SSE).
 
 ---
 
@@ -104,19 +104,42 @@
   - `chore(types): align onboarding + twin types with backend route handlers` — `03b3b02`
   - `feat(onboarding): split monolith into 4-layer + finalize flow` — `9e53f89`
 
-**Session 3 (Match + SSE debate): NOT STARTED.**
+**Session 3 (Match + SSE debate — 2026-05-19):**
+
+- [x] **Pre-flight.** `git fetch + pull --ff-only origin integration/session-1-foundation` clean. Renamed frontend remote from old `vab-viah` to `Lab-Viah-Frontend` per owner's repo rename after Session 2. No local divergences.
+- [x] **Source-of-truth realignment.** Read `backend/src/routes/match.routes.ts`, `stream.routes.ts`, `find-matches.workplan.ts`, `agents/_shared/types.ts` + `trace.ts`. Drift found vs Session 1 type stubs: `/match/results/:flowId` returns `{flowId, topThree, allDebated}` of `StoredReportRow` (NOT `{reports: CompatibilityReport[]}`), reports have no `id` / `user_twin_id` / `flow_id` / `candidate` fields (candidate name lives inside `reasoning_trace.candidate_name`), `/baseline/match` returns `{userTwinId, ranking: [{candidateId, candidateName, baselineScore}]}` (NOT the flat shape). Also confirmed: **SSE route has NO `requireUserId` check today** — Bearer header attached defensively in the wrapper anyway.
+- [x] **`src/api/types.ts` realigned.** Added `StoredReport` (the actual wire row shape); aliased `CompatibilityReport = StoredReport` so the legacy name keeps working. `MatchResultsResponse = {flowId, topThree, allDebated}`. `BaselineMatchResponse` uses real backend shape. `toFrontendMatch` now reads `reasoning_trace.candidate_name` (no `candidate` object on the wire), surfaces `top_strengths[0]` + `top_friction_points[0]` as card-level narrative, and adds `dealbreakersHit` + `candidateTwinId` fields for the new deck UI. `FrontendMatch.city/profession/age` retained but blank — those live on TwinSpec, not on the report.
+- [x] **`src/navigation/types.ts`** — `DiscoverStackParamList.TwinDebate` + `CompatibilityReport` now carry `{flowId, candidateTwinId, displayName}` (was `{matchId, matchName, overallScore?}`). Necessary so both screens can subscribe to the right SSE stream and pick the right row from `/match/results`.
+- [x] **`src/api/sse.ts`** — typed wrapper around `react-native-sse@^1.2.1`. Builds URL via `buildStreamUrl`, attaches `Authorization: Bearer <jwt>` defensively, parses each `message` event into the 11-variant `TraceEvent` union with an exhaustiveness check, surfaces three separate callbacks (`onEvent` for TraceEvents, `onStreamError` for backend `{type:'error'}` envelope, `onError` for network/parse failures). Explicit `close()` on `workplan.finished` AND on caller unsubscribe. Removed wrong `pollingInterval:0` (that means *instant* reconnect, not no reconnect — relying on `close()` to flip `status=CLOSED` which the library bails on). Drops `heartbeat` events and non-JSON gracefully — never crashes the stream.
+- [x] **`src/hooks/useTraceStream.ts`** — React hook reducing the firehose into a screen-friendly view: `status` (connecting/streaming/finished/error), `phase` (connecting → reading_profiles → debating → ranking → finished), per-dimension scores keyed by `Dimension`, decision bubbles (id + agent + decision + rationale + ts), observation list, recovery list, tool-call list, `outcome` payload from `workplan.finished`. Phase derived from `task.started` events emitted by find-matches.workplan.ts (`load_user_twin`/`prescreen_candidates` → reading_profiles, `parallel_debates` → debating, `rank_reports`/`persist_reports` → ranking). React 19 strict-mode double-fire guarded with a ref keyed on flowId.
+- [x] **`MatchPoolScreen.tsx` (rewrite).** POSTs `/match/request` once on mount (gate via `useRef`), subscribes to SSE via `useTraceStream`. When `trace.status === 'finished'`, fetches `/match/results/:flowId` and renders **Tinder-style swipeable deck**. Implementation uses RN core `PanResponder` + `Animated` — no extra deps (avoided pulling in `react-native-gesture-handler`/`reanimated` for a 1-day shipping deadline). Right swipe / "→" button = consider → navigates to TwinDebate with `flowId + candidateTwinId`. Left swipe / "✕" = local dismiss (backend has no skip endpoint). Cards show blurred avatar (no PII reveal until booking), score chip (color-coded by 80/60), recommendation pill, top strength tile, top friction / dealbreaker tile. CONSIDER / PASS overlays animate in via panX interpolation. Deck capped at top 10 candidates. Loading state surfaces live phase label + decision counter + dim-scored counter so the 30-45s wait feels purposeful. Error state + empty state with retry CTAs.
+- [x] **`TwinDebateScreen.tsx` (rewrite).** Dropped fake `Animated` bubble timeline + `mockData` imports. Subscribes to SSE via `useTraceStream(flowId)` from route params. UI sections:
+  - Phase rail (4 segments, active highlighted) driven by `task.started` boundaries.
+  - 8-cell dimension scoreboard. Each `dimension.scored` event fills a signed bar (`|score|·100%`, sign flips emerald/orange). Evidence quote appears below the bar when available.
+  - Decision bubbles for `agent.decision` events with typewriter reveal (~18ms/char). Tone differs for moderator / user_twin / candidate_twin / workplan. Auto-scrolls.
+  - Collapsible tool-call section (chevron-toggle, default closed) — useful for judges probing the trace but not noisy for non-devs.
+  - Recovery counter band when retries happened.
+  - On `workplan.finished` → verdict banner + CTA "View Compatibility Report →" routes to CompatibilityReport with the same `{flowId, candidateTwinId, displayName}`.
+- [x] **`CompatibilityReportScreen.tsx` (rewrite).** Fetches via `api.match.results(flowId)`, picks the row whose `candidate_twin_id` matches the route param (`allDebated` first, falls back to `topThree`, error CTA if neither). Renders the hero score (`overall_score * 100`), recommendation pill, per-dimension breakdown with `DIMENSION_LABELS` (so "dealbreakers" → "Boundaries"), evidence quote per dim, friction level badge per dim, top strengths section, top friction / dealbreakers section with hit-on chips. CTAs route into Booking and DisputeForm via the parent stack.
+- [x] **`npm run typecheck` clean.**
+- [x] **Session 3 commits** (3 logical chunks) pushed to `origin/integration/session-1-foundation`:
+  - `chore(types): align match types with backend route handlers` — `7c9366a`
+  - `feat(sse): typed EventSource wrapper + useTraceStream hook` — `f4c826b`
+  - `feat(match): wire match flow end-to-end against real backend` — `3c11166`
+
 **Session 4 (Booking + Dispute + Feedback + Wali decouple): NOT STARTED.**
 **Session 5 (Premium UI polish): NOT STARTED.**
 
 ### Blockers
 
-- *(none — Session 2 closed cleanly. Real-device smoke test still deferred to user — typecheck + flow logic verified, but no `expo start` was run inside this session. See "Open questions" below.)*
+- *(none — Session 3 closed cleanly. Real-device smoke test of the full match flow is the user's next step — typecheck passes, flow logic verified, but no `expo start` was run inside this session.)*
 
 ### Open questions for the user
 
-- **Real-device smoke test of OTP + onboarding flow.** Run `cd backend && npm run dev` in one terminal. For physical phone testing, find your laptop's LAN IP (`ipconfig` → IPv4) and set `EXPO_PUBLIC_API_URL=http://<that-IP>:3000` in `.env`. Then `cd frontend/vab-viah && npx expo start --lan` (or `--tunnel` if firewall blocks). Verify: `+923001234567` → `0000` → Layer 1 chat (≥3 turns until Layla advances) → 12 cards → 3 corrections → skip wali → Forge Twin → MainTabs. Kill app mid-Layer 2 → relaunch → should land on Layer 2 at the next unanswered card. If `Send Code` still fails, walk through the OTP fix steps documented in the Session 1 handoff (firewall on port 3000, ATS on iOS — now patched in app.json, etc.).
-- **Railway URL** — backend Session 5 deployed to Railway; URL not yet recorded. When you have it, update `EXPO_PUBLIC_API_URL` in `.env` to test against production (also avoids LAN/ATS headaches entirely).
-- **Frontend repo merge policy** — Session 2 also lands on `integration/session-1-foundation` (per user direction at session start). Confirm if/when you want this merged to `main` or kept as a long-lived integration branch through Session 5.
+- **Real-device smoke test of the match flow.** With backend running and a forged Twin already in Supabase (e.g. `+923001234567` / `0000` → existing twin `281742cf-...` from Session 2 demo): launch app → MainTabs → Discover tab → MatchPool should POST `/match/request`, show "Running Twin debates" with live phase + decision counter, then 30-45s later render the swipeable deck. Right-swipe → TwinDebate should show phase rail advancing, dim cells filling in real time, decision bubbles typing in. On verdict → "View Compatibility Report →" → per-dim breakdown with evidence. If SSE doesn't connect (most likely culprit on a fresh device: the laptop firewall blocks port 3000 from the LAN, or Android cleartext denied) the screen will hang on "Connecting…" — check `EXPO_PUBLIC_API_URL` and that backend logs show the GET `/stream/...` arriving.
+- **Railway URL** still pending — same as Session 2's open question. Useful for judges who don't share a LAN with the user.
+- **Polling fallback** intentionally NOT implemented. SSE is the documented path; if it turns out to be flaky on the device under load, a simple `useQuery` polling `/match/results` with `refetchInterval: 4000` until non-404 is the fallback. Wire only if needed — adds latency to the demo's wow-factor.
+- **Frontend repo merge policy** — Session 3 also lands on `integration/session-1-foundation`. Same decision still deferred.
 
 ---
 
@@ -195,7 +218,7 @@ npx tsc --noEmit           # typecheck (add to package.json scripts in Session 1
 |---|---|---|---|
 | 1 | Foundation: API client + auth + env | 3 hrs | ✅ DONE |
 | 2 | Onboarding restructure (4-layer flow) | 4 hrs | ✅ DONE |
-| 3 | Match flow + SSE Twin debate | 5 hrs | NOT STARTED |
+| 3 | Match flow + SSE Twin debate | 5 hrs | ✅ DONE |
 | 4 | Booking + Dispute + Feedback + Wali decouple | 4 hrs | NOT STARTED |
 | 5 | Premium UI polish (time-boxed) | 3 hrs | NOT STARTED |
 
@@ -226,58 +249,66 @@ Each session is independently scoped — a lighter model can pick up Session N b
 14. **Backend session expiry → restart at Layer 1.** Backend in-memory sessions TTL at 15 min. Frontend `_shared.handleExpiredSession` catches `NOT_FOUND`/`CONFLICT` from any layer call, clears local state, alerts the user, and routes back to `OnboardingLayer1`. No partial resume after expiry — simpler than trying to re-mint mid-flow.
 15. **Backend dispatch shape for Layer 3.** Reading `backend/src/routes/onboarding.routes.ts` confirmed the route distinguishes generate vs correct by **presence of `corrections`**, not by a `mode` field. `Layer3Request` typed as a discriminated union on `corrections` (no `mode`). Both modes return the same `statements: TwinStatement[]` response.
 
+### Session 3 (2026-05-19, with user)
+
+16. **Swipe deck via RN core, not a 3rd-party library.** Tinder-style deck on `MatchPoolScreen` built on `PanResponder` + `Animated` (both shipped with RN). Considered `react-native-deck-swiper` and `react-native-gesture-handler` + `reanimated`, rejected both: extra deps mean another `npx expo install` round trip + autolinking risk on a 1-day shipping deadline, and a basic 3-card deck doesn't need the perf headroom Reanimated buys.
+17. **SSE for match flow, no polling fallback.** Match flow drives off `/stream/:flowId` exclusively — we subscribe, watch for `workplan.finished`, then fetch `/match/results`. No polling fallback added. Rationale: MASTERPLAN §4 explicitly prefers SSE, and the workplan emits `task.started`/`task.finished`/`dimension.scored` events that make the loading state meaningful (live phase, dim counter) rather than a spinner. Backend SSE route has no auth check today, so even network-flakey clients should reach it; if it does turn out to be flaky on physical devices, the fallback is a 5-line `useQuery` polling `/match/results` every 4s.
+18. **Real wire shape ≠ Session 1 inference.** `/match/results/:flowId` returns `{flowId, topThree, allDebated}` of `StoredReportRow` — not `{reports: CompatibilityReport[]}`. Rows have no `id`/`user_twin_id`/`flow_id`/`candidate` fields; the candidate's display name lives inside `reasoning_trace.candidate_name`. Updated `types.ts` accordingly. `CompatibilityReport` retained as an alias for `StoredReport` to avoid a ripple rename through the codebase.
+19. **Match cards show narrative, not demographics.** Real backend reports DON'T carry candidate city / profession / age — those live only on the TwinSpec which isn't exposed to the API today. So the swipe card prioritizes the narrative payoff instead: blurred avatar + score chip + recommendation pill + top strength snippet + top friction (or dealbreaker) snippet. This actually plays better in demo than demographic data would have.
+20. **SSE wrapper: keep heartbeat / `{type:'error'}` out of the timeline.** Backend emits `{type:'heartbeat'}` for `demo_*` flowIds and `{type:'error', message}` for unknown flowIds. The `subscribe()` wrapper routes these to separate callbacks (`onStreamError` for backend error envelope, drop heartbeat entirely) instead of forwarding them to `onEvent` as TraceEvents — so the timeline UI never sees a non-TraceEvent. Parse failures get a `__DEV__` console.warn but never crash the stream.
+
 ---
 
 ## 6. Handoff for next session
 
-**Next session: Session 3 — Match flow + SSE Twin debate.**
+**Next session: Session 4 — Booking + Dispute + Feedback + Wali decouple.**
 
 ### Starting state
 
-- Branch `integration/session-1-foundation` on `frontend/vab-viah` repo, head at `9e53f89` (`feat(onboarding): split monolith into 4-layer + finalize flow`). Pushed to origin. Session 3 also commits to this branch (per Decision #9).
-- Backend running at `http://localhost:3000` (user starts with `cd backend && npm run dev`). Dev OTP bypass: `+923001234567` / `0000`.
-- `.env` defaults to `EXPO_PUBLIC_API_URL=http://localhost:3000`; physical-device usage swaps to LAN IP per docs in `.env.example`. iOS ATS / Android cleartext already enabled in `app.json` for dev http.
-- Full onboarding flow lands a real Twin v1 in Supabase. `/twin/me` returns the spec. `useAppStore.twinSpec` mirrors it. `hasTwin` is the boot-routing gate.
-- `OnboardingStack` lives under `Onboarding` in `RootStackParamList`. Resume works via `onboardingLastLayer` (0-4) + `onboardingAnsweredCardIds`. Session expiry handled by `_shared.handleExpiredSession`.
-- All non-onboarding screens still run on **mock data**: `MatchPoolScreen`, `TwinDebateScreen`, `CompatibilityReportScreen`, `BookingScreen`, `WaliDashboardScreen`, `FeedbackSurveyScreen`, `DisputeFormScreen`. Session 3 wires Match + Debate.
-- `api.match.{request,results,baseline}` and `buildStreamUrl(flowId)` are typed stubs in `client.ts` ready to use. `TraceEvent` union is fully mirrored in `types.ts`. `react-native-sse@^1.2.1` installed since Session 1.
+- Branch `integration/session-1-foundation` on `frontend/vab-viah` repo, head at `3c11166` (`feat(match): wire match flow end-to-end against real backend`). Pushed to origin (`https://github.com/muhammad-jawad-ali/Lab-Viah-Frontend.git`). Session 4 also commits to this branch (per Decision #9).
+- Backend running at `http://localhost:3000` (user starts with `cd backend && npm run dev`). Dev OTP bypass: `+923001234567` / `0000`. Backend repo untouched in Session 3.
+- Full pipeline now lands on real backend: Signup → Onboarding → MainTabs → MatchPool (real `/match/request` + SSE + `/match/results`) → TwinDebate (live phased visualization off `/stream/:flowId`) → CompatibilityReport (per-dim breakdown with evidence). All wired against real Supabase data.
+- `src/api/sse.ts` (typed EventSource wrapper) + `src/hooks/useTraceStream.ts` (reduces 11-variant TraceEvent firehose into screen-friendly state) are reusable for any other workplan-driven flow — including `book_meeting` and `handle_dispute` workplans in Session 4.
+- Mock-driven screens REMAINING (Session 4 targets): `BookingScreen`, `WaliDashboardScreen` (to be decoupled per Decision #2), `FeedbackSurveyScreen`, `DisputeFormScreen`. `useAppStore.meetingsList` is currently mock-seeded — needs to flow from `/book/confirm` response.
 
-### Reads required at Session 3 start
+### Reads required at Session 4 start
 
 1. This file (`SESSION_CONTEXT.md`) — sections 1, 2, 6 minimum.
-2. `MASTERPLAN.md` §7 Session 3 block.
-3. `backend/src/routes/match.routes.ts` — confirm exact request/response shapes for `/match/request`, `/match/results/:flowId`, `/baseline/match`. **Treat the route file as source of truth**; the shapes in `src/api/types.ts` are inferred (same caution as Session 2).
-4. `backend/src/routes/sse.routes.ts` (or wherever `/stream/:flowId` lives) — confirm auth model (Bearer header? query token?) and event format. `react-native-sse` supports custom headers; verify it works with the backend's expected auth.
-5. `backend/src/workplans/find-matches.workplan.ts` — understand the debate lifecycle and which `TraceEvent` types are emitted.
-6. `backend/src/agents/_shared/types.ts` — confirm `TraceEvent` union still matches `src/api/types.ts` (Session 1 mirrored it; check for backend drift).
-7. `frontend/vab-viah/src/screens/MatchPoolScreen.tsx` + `TwinDebateScreen.tsx` + `CompatibilityReportScreen.tsx` — current mock-driven UIs to wire up.
-8. `frontend/vab-viah/src/api/mockData.ts` — to be deprecated as real data flows in.
+2. `MASTERPLAN.md` §7 Session 4 block. §3 Non-negotiable #6 (Wali decoupling spec).
+3. `backend/src/routes/booking.routes.ts` — confirm `/book/initiate` + `/book/confirm` exact body + response shapes. Session 1 inferred them; treat the route as source of truth (same drift caution as Sessions 2 + 3).
+4. `backend/src/routes/dispute.routes.ts` + `backend/src/routes/feedback.routes.ts` — same drill.
+5. `backend/src/workplans/book-meeting.workplan.ts` — book_meeting workplan emits live trace events too (wali brief generation, slot synthesis, venue lookup). `useTraceStream` will work as-is.
+6. `backend/src/workplans/handle-dispute.workplan.ts` — same.
+7. `frontend/vab-viah/src/screens/BookingScreen.tsx`, `WaliDashboardScreen.tsx`, `FeedbackSurveyScreen.tsx`, `DisputeFormScreen.tsx` — current mock-driven UIs.
+8. `frontend/vab-viah/src/navigation/AppNavigator.tsx` — WaliTab needs to come out of MainTabs (Decision #2) and the wali brief moves inside BookingScreen as an expandable panel.
 
-### Session 3 deliverables (from MASTERPLAN §7)
+### Session 4 deliverables (from MASTERPLAN §7)
 
-- `src/api/sse.ts` — typed wrapper around `react-native-sse` that auths via Bearer header, parses `TraceEvent` JSON, exposes typed `subscribe(flowId, onEvent, onError)` returning an `unsubscribe` fn. Reuses `buildStreamUrl`.
-- `MatchPoolScreen.tsx` — replace mockData with `useQuery(['matches'], api.match.request → poll api.match.results)`. Use the `toFrontendMatch` adapter (`overall_score * 100`). Surface compatibility scores, top strengths, dealbreakers-hit chips.
-- `TwinDebateScreen.tsx` — drop the fake `Animated` timeline. On mount, call `api.match.request()` (if no flowId in route param), subscribe to `/stream/:flowId`, render TraceEvents as a typed timeline. Show agent observations / decisions, tool calls, dimension scores in real time. Friction map populated from `dimension.scored` events.
-- `CompatibilityReportScreen.tsx` — fetch by `flowId` (route param), render the full `CompatibilityReport`: per-dim scores w/ evidence, top strengths, top friction points, dealbreakers, recommendation.
-- Optional: small SSE progress indicator on `OnboardingFinalizeScreen` reusing the same sse.ts wrapper (sessionId === flowId for the onboarding trace) — nice-to-have for the demo.
+- `BookingScreen.tsx` — POST `/book/initiate` on entry → subscribe to `/stream/:flowId` (book_meeting workplan emits wali brief, slots, venues live). Render proposed slots + venues as picker UI. Render wali brief (EN + RO_UR text + TTS audio + SMS preview) as an EXPANDABLE PANEL with copy "Share with your wali — proceed regardless." `Confirm` button POSTs `/book/confirm`, persists returned `Meeting` to `useAppStore.meetingsList` (replace mock seed).
+- Remove `WaliDashboardScreen` from MainTabs. Its content (wali brief preview, SMS share, audio play) folds into the BookingScreen wali panel. Per Decision #2.
+- `DisputeFormScreen.tsx` — POSTs `/dispute/file` with `{meetingId, type, narrative}` → renders the returned `DisputeResolution` (action + rationale + reputation_impact). handle_dispute workplan also emits trace events worth showing.
+- `FeedbackSurveyScreen.tsx` — POSTs `/feedback/post-meeting` with `{meetingId, ratings, narrative}` → on success show "New Twin version forged" (response carries `newTwinId` + `systemPromptRefreshed`). Trigger a re-fetch of `/twin/me` so `useAppStore.twinSpec` reflects the new version.
+- `MeetingStackParamList.Booking` already takes `{matchId, matchName}` — keep that contract (it's invoked from CompatibilityReport via parent navigator); inside Booking, treat `matchId` as `candidateTwinId` for the POST body.
 
-### Session 3 exit check
+### Session 4 exit check
 
-- [ ] User with a forged Twin enters MatchPool → sees real compatibility scores from backend
-- [ ] Tap a match → TwinDebateScreen subscribes to `/stream/:flowId` and renders live TraceEvents (agent observations, dimension.scored, decisions) until `workplan.finished`
-- [ ] After debate finishes → CompatibilityReport renders per-dim breakdown w/ evidence
-- [ ] `npm run typecheck` clean
-- [ ] Commit + push on `integration/session-1-foundation` (Conventional Commits style — `feat(match): wire SSE debate timeline`, etc.)
-- [ ] All non-match screens still work (no regressions in Onboarding / Settings / Booking)
+- [ ] User can confirm a meeting from a CompatibilityReport → BookingScreen renders real slots/venues from `/book/initiate` and persists confirmed meeting via `/book/confirm`.
+- [ ] WaliTab removed from MainTabs; wali brief surfaces inside BookingScreen as an expandable panel with copy + audio + SMS preview.
+- [ ] FeedbackSurveyScreen + DisputeFormScreen post against real endpoints and render the typed responses.
+- [ ] `npm run typecheck` clean.
+- [ ] No regressions in Onboarding / Match flow.
+- [ ] Commit + push on `integration/session-1-foundation` (Conventional Commits — `feat(book): wire booking against /book/initiate`, etc.).
 
-### Known gotchas for Session 3
+### Known gotchas for Session 4
 
-- **SSE auth on React Native.** `react-native-sse` accepts a `headers` option. Backend expects `Authorization: Bearer <JWT>` (per `_auth.middleware.ts`). Test with `+923001234567` / `0000` dev JWT first.
-- **EventSource lifecycle.** Always `close()` the connection on screen unmount. Failure to do this leaves a hanging WebSocket-like connection that drains battery and confuses backend trace bookkeeping.
-- **`overall_score` is 0..1.** Use `toFrontendMatch` adapter (already in `src/api/types.ts`) which scales to 0..100 for display. Don't hardcode `* 100` in screens.
-- **`find_matches` is workplan-driven.** Hitting `/match/request` returns `{flowId, streamUrl}` synchronously but the actual debate runs async. `/match/results/:flowId` 404s until the workplan is `finished`. Either subscribe to SSE for `workplan.finished` then fetch results, OR poll results with `staleTime: 0` + `refetchInterval` set to a reasonable cadence (3-5s). MASTERPLAN prefers SSE-driven.
-- **TraceEvent union has 11 variants.** Render with an exhaustive switch + a `_default` fallback to avoid crashing on a new variant — `agent.message`, `recovery`, `task.finished`, etc. all show up in real debates.
-- **Read the route file first.** Same caution as Session 2 — shapes in `src/api/types.ts` for match/baseline are inferred. Confirm against `backend/src/routes/match.routes.ts` and adjust types if there's drift before wiring screens.
+- **Booking workplan is also workplan-driven.** `/book/initiate` returns `{flowId, meetingId, briefs, slots, venues}` synchronously but the workplan keeps running (wali brief audio generation, etc.). Reuse `useTraceStream` if you want a "Building your booking…" live indicator.
+- **TTS audio is a base64 data URI.** `WaliBrief.audio_dataUri` is base64 — `expo-av` can play it directly from a data URI, but the URI is large; lazy-load only when the user expands the wali panel.
+- **`meetingsList` shape mismatch.** Frontend `useAppStore.meetingsList` is shaped for the mock UI (`{id, matchName, slotDay, slotTime, type, location?, status}`). Backend `Meeting` is `{id, user_id, candidate_id, slot_iso, venue, wali_contacts, meeting_card_url, status, reminders}`. Adapt at the API boundary like `toFrontendMatch` does — don't reshape the store from inside the screen.
+- **MeetingsTab is a sub-stack.** When CompatibilityReport routes to Booking, it goes via `navigation.getParent()?.navigate('MeetingsTab', {screen: 'Booking', params: ...})`. Pattern already used in CompatibilityReport — copy it.
+- **Wali phone may be absent.** Onboarding Layer 4 is skippable (Decision #2 + MASTERPLAN non-negotiable #6). Backend still generates the wali brief but `wali_contacts` may be empty. Handle null/missing wali in the BookingScreen wali panel.
+- **Backend Pro thinking budget.** From Session 2's Gemini bug fix: don't add agent calls with `maxOutputTokens < 1500` on Pro. Not your concern unless you touch backend agents; flag if you spot it.
+- **SSE close lifecycle.** Same as Session 3 — the wrapper auto-closes on `workplan.finished` but you MUST also call `unsubscribe()` on screen unmount (the hook does this via `useEffect` cleanup; if you write a screen that doesn't use the hook, mirror that pattern).
+- **React 19 strict-mode double-fire.** Same as Sessions 2 + 3. Guard any expensive POST (`/book/initiate` kicks a Gemini workplan) with a `useRef` gate keyed on identity input.
 
 ---
 
