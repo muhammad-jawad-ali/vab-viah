@@ -1,5 +1,5 @@
 # RishtaAI Frontend — Implementation Plan
-> Cross-referenced: `RishtaAI_PRD_v1.0.md` × `API_DOCS.md`  
+> Cross-referenced: [Product Requirements Document](../specifications/product_requirements_document.md) × [API Documentation](../specifications/api_documentation.md)  
 > Current date: 2026-05-18 (Day 3 of 5-day sprint)
 
 ---

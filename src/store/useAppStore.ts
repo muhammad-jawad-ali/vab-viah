@@ -95,7 +95,16 @@ export const useAppStore = create<AppState>((set) => ({
       age: 29,
       city: 'Islamabad',
       profession: 'Chartered Accountant'
-    }
+    },
+    { id: '4', name: 'Zainab F.', blurAvatar: 'https://i.pravatar.cc/150?u=44', compatibility: 78, tags: ['Teacher', 'Family-oriented'], status: 'new', age: 26, city: 'Lahore', profession: 'Teacher' },
+    { id: '5', name: 'Hassan K.', blurAvatar: 'https://i.pravatar.cc/150?u=55', compatibility: 60, tags: ['Banker', 'Extrovert'], status: 'new', age: 31, city: 'Karachi', profession: 'Banker' },
+    { id: '6', name: 'Fatima A.', blurAvatar: 'https://i.pravatar.cc/150?u=66', compatibility: 71, tags: ['Architect', 'Creative'], status: 'new', age: 28, city: 'Islamabad', profession: 'Architect' },
+    { id: '7', name: 'Usman R.', blurAvatar: 'https://i.pravatar.cc/150?u=77', compatibility: 85, tags: ['Engineer', 'Introvert'], status: 'new', age: 33, city: 'Lahore', profession: 'Engineer' },
+    { id: '8', name: 'Ayesha S.', blurAvatar: 'https://i.pravatar.cc/150?u=88', compatibility: 68, tags: ['Doctor', 'Ambitious'], status: 'new', age: 27, city: 'Karachi', profession: 'Doctor' },
+    { id: '9', name: 'Tariq M.', blurAvatar: 'https://i.pravatar.cc/150?u=99', compatibility: 55, tags: ['Sales', 'Frequent Traveler'], status: 'new', age: 34, city: 'Dubai', profession: 'Sales Manager' },
+    { id: '10', name: 'Zahra B.', blurAvatar: 'https://i.pravatar.cc/150?u=101', compatibility: 92, tags: ['Writer', 'Homebody'], status: 'new', age: 25, city: 'Islamabad', profession: 'Writer' },
+    { id: '11', name: 'Ali W.', blurAvatar: 'https://i.pravatar.cc/150?u=111', compatibility: 75, tags: ['Chef', 'Foodie'], status: 'new', age: 30, city: 'Lahore', profession: 'Chef' },
+    { id: '12', name: 'Sana H.', blurAvatar: 'https://i.pravatar.cc/150?u=121', compatibility: 81, tags: ['Lawyer', 'Activist'], status: 'new', age: 29, city: 'Karachi', profession: 'Lawyer' }
   ],
   debateLog: [
     { speaker: 'userTwin', text: 'Assalam o Alaikum. Career growth is extremely essential to me, and I wish to continue practice post-marriage.' },
