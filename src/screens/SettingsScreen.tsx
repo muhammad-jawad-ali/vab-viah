@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { View, Text, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 
 const SettingRow = ({ label, value, onPress, isDanger }: { label: string, value?: string, onPress?: () => void, isDanger?: boolean }) => (
@@ -13,7 +12,16 @@ const SettingRow = ({ label, value, onPress, isDanger }: { label: string, value?
 
 export const SettingsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const { user, isPremium, setPremium } = useAppStore();
+  const { user, isPremium, setPremium, toggleWaliMode, logout } = useAppStore();
+  const [baselineMode, setBaselineMode] = useState(false);
+  const [notifications, setNotifications] = useState(true);
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); navigation.reset({ index: 0, routes: [{ name: 'Signup' }] }); } },
+    ]);
+  };
 
   return (
     <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
@@ -25,8 +33,8 @@ export const SettingsScreen = ({ navigation }: any) => {
         </View>
 
         <TouchableOpacity 
-          onPress={() => navigation.navigate('ProfileSetup')}
-          className="bg-primary-dark p-6 rounded-[32px] shadow-xl mb-8 flex-row items-center"
+          onPress={() => navigation.navigate('BasicProfileSetup')}
+          className="bg-primary-dark p-6 rounded-t-[32px] border-b border-white/10 flex-row items-center"
         >
           <View className="w-16 h-16 bg-surface/10 rounded-full border border-surface/20 items-center justify-center mr-4">
             <Text className="text-3xl">👤</Text>
@@ -38,19 +46,37 @@ export const SettingsScreen = ({ navigation }: any) => {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('TwinOnboarding')}
+          className="bg-primary-dark/90 p-5 rounded-b-[32px] shadow-xl mb-8 flex-row items-center justify-between"
+        >
+          <View>
+            <Text className="text-surface font-bold text-sm">Retrain AI Twin</Text>
+            <Text className="text-slate-400 text-xs">Redo the scenario cards</Text>
+          </View>
+          <Text className="text-xl">🔄</Text>
+        </TouchableOpacity>
+
         <View className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 mb-6">
           <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">App Preferences</Text>
           <View className="flex-row justify-between items-center py-4 border-b border-slate-100">
             <Text className="font-bold text-slate-700">Push Notifications</Text>
-            <Switch trackColor={{ true: '#059669', false: '#e2e8f0' }} value={true} />
+            <Switch trackColor={{ true: '#059669', false: '#e2e8f0' }} value={notifications} onValueChange={setNotifications} />
           </View>
           <View className="flex-row justify-between items-center py-4 border-b border-slate-100">
             <Text className="font-bold text-slate-700">Wali Mode</Text>
-            <Switch trackColor={{ true: '#059669', false: '#e2e8f0' }} value={user?.isWaliMode} />
+            <Switch trackColor={{ true: '#059669', false: '#e2e8f0' }} value={user?.isWaliMode ?? false} onValueChange={toggleWaliMode} />
           </View>
-          <View className="flex-row justify-between items-center py-4">
+          <View className="flex-row justify-between items-center py-4 border-b border-slate-100">
             <Text className="font-bold text-slate-700">Premium Status</Text>
             <Switch trackColor={{ true: '#d4af37', false: '#e2e8f0' }} value={isPremium} onValueChange={setPremium} />
+          </View>
+          <View className="flex-row justify-between items-center py-4">
+            <View className="flex-1 mr-4">
+              <Text className="font-bold text-slate-700">🔬 Baseline Mode</Text>
+              <Text className="text-slate-400 text-xs">Demo: compare agentic vs heuristic matching</Text>
+            </View>
+            <Switch trackColor={{ true: '#f59e0b', false: '#e2e8f0' }} value={baselineMode} onValueChange={setBaselineMode} />
           </View>
         </View>
 
@@ -59,7 +85,7 @@ export const SettingsScreen = ({ navigation }: any) => {
           <SettingRow label="Help Desk / FAQ" onPress={() => navigation.navigate('HelpDesk')} />
           <SettingRow label="Privacy Policy" />
           <SettingRow label="Terms of Service" />
-          <SettingRow label="Sign Out" isDanger />
+          <SettingRow label="Sign Out" isDanger onPress={handleSignOut} />
           <SettingRow label="Delete Account" isDanger />
         </View>
 
