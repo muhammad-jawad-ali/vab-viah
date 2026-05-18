@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useAppStore } from '../store/useAppStore';
 
 // Types
 import { RootStackParamList, MainTabsParamList, DiscoverStackParamList, MeetingStackParamList, ProfileStackParamList } from './types';
@@ -191,8 +192,14 @@ const MainTabs = () => (
 );
 
 export const AppNavigator = () => {
+  // App.tsx awaits loadAuth() before mounting, so by the time this renders
+  // the Zustand auth slice is hydrated. If a token exists we boot into Main
+  // (Session 2 will introduce a richer routing decision based on /twin/me).
+  const token = useAppStore((s) => s.token);
+  const initialRouteName: keyof RootStackParamList = token ? 'Main' : 'Signup';
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen name="TwinOnboarding" component={TwinOnboardingScreen} />
