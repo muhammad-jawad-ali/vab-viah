@@ -91,53 +91,143 @@ export type TwinSpec = {
   version: number;
 };
 
-export type TwinMeResponse = { twin: TwinSpec; twinId: string; version: number };
+export type TwinMeResponse = {
+  twinId: string;
+  spec: TwinSpec;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // ---------------------------------------------------------------------------
 // Onboarding — POST /onboarding/{layer1,layer2,layer3,wali,finalize}.
-// Shapes below are inferred from backend SESSION_CONTEXT + routes; confirm
-// against the actual route handlers before wiring each in Session 2.
+// Mirrors backend/src/routes/onboarding.routes.ts +
+// backend/src/workplans/onboarding.workplan.ts. Source of truth: those files.
 // ---------------------------------------------------------------------------
+
+// What backend extracts from the chat turn. Mirrors ExtractedSchema in
+// backend/src/agents/onboarding.agent.ts. All fields optional / partial.
+export type OnboardingExtracted = Partial<{
+  identity: Partial<{ name: string; age: number; gender: Gender; city: string }>;
+  deen_level: DeenLevel;
+  family_setup: FamilySetup;
+  career: Partial<{ current: string; five_yr_goal: string }>;
+  kids_timeline: KidsTimeline;
+  geography: Partial<{ current_city: string; ten_yr_pref: string; flexible: boolean }>;
+  dealbreakers: string[];
+}>;
+
+export type OnboardingPayload = OnboardingExtracted & {
+  per_field_confidence?: Record<string, number>;
+};
+
+export type OnboardingNextTopic =
+  | 'identity'
+  | 'deen'
+  | 'family'
+  | 'career'
+  | 'kids'
+  | 'geography'
+  | 'dealbreakers'
+  | 'done';
+
+export type OnboardingTurnResult = {
+  reply: string;
+  extracted: OnboardingExtracted;
+  confidence: number;
+  next_topic: OnboardingNextTopic;
+  chip_options?: string[];
+  sttConfidence?: number;
+  sttStub?: boolean;
+};
+
+// Layer 1 — chat interview. Backend takes exactly one of `text` or
+// `audioBase64`; sessionId is omitted on the first call and round-tripped after.
 export type Layer1Request = {
   sessionId?: string;
-  message: string;
-  language_pref?: LanguagePref;
+  language?: LanguagePref;
+  text?: string;
+  audioBase64?: string;
 };
 export type Layer1Response = {
   sessionId: string;
-  next_prompt: string;
-  confidence: number;
-  chips?: string[];
-  done: boolean;
+  flowId: string;
+  turn: OnboardingTurnResult;
+  turnNumber: number;
+  payload: OnboardingPayload;
 };
 
-export type Layer2Request = { sessionId: string; cardId: string; choiceIndex: number };
+// Layer 2 — scenario cards. Vector values clamped to [-1, 1] per dimension.
+export type RadarVector = Partial<Record<Dimension, number>>;
+export type RadarState = {
+  vector: RadarVector;
+  cardsAnswered: number;
+  cardsRemaining: string[];
+};
+export type Layer2Request = { sessionId: string; cardId: string; optionId: string };
 export type Layer2Response = {
   sessionId: string;
-  cardIndex: number;
-  totalCards: number;
-  radar: Record<Dimension, number>;
-  done: boolean;
+  flowId: string;
+  radar: RadarState;
 };
 
-export type Layer3GenerateRequest = { sessionId: string; mode: 'generate' };
+// Layer 3 — Twin statements + corrections.
+// Backend dispatches on presence of `corrections`, NOT on a `mode` field.
+export type TwinStatement = {
+  dimension: Dimension;
+  statement: string;
+  agree: boolean | null;
+  correction?: string;
+};
+export type Layer3Correction = {
+  dimension: Dimension;
+  agree: boolean;
+  correction?: string;
+};
+export type Layer3GenerateRequest = { sessionId: string };
 export type Layer3CorrectRequest = {
   sessionId: string;
-  mode: 'correct';
-  corrections: { index: number; revised: string }[];
+  corrections: Layer3Correction[]; // 1..3 items
 };
 export type Layer3Request = Layer3GenerateRequest | Layer3CorrectRequest;
-export type Layer3Response = { statements?: string[]; twinPreview?: Partial<TwinSpec> };
+export type Layer3Response = {
+  sessionId: string;
+  flowId: string;
+  statements: TwinStatement[];
+};
 
+// Layer 4 — wali. wali_phone required (E.164); override object required but
+// inner fields all optional, so `override: {}` is valid.
+export type WaliOverride = Partial<{
+  deen_level: DeenLevel;
+  family_setup: FamilySetup;
+  kids_timeline: KidsTimeline;
+  dealbreakers: string[];
+}>;
+export type ConflictFlag = {
+  field: string;
+  user_value: unknown;
+  wali_value: unknown;
+};
 export type WaliRequest = {
   sessionId: string;
-  wali_contact?: string;
-  overrides?: Partial<TwinSpec>;
+  wali_phone: string;
+  override: WaliOverride;
+  notes?: string;
 };
-export type WaliResponse = { sessionId: string; applied: boolean };
+export type WaliResponse = {
+  sessionId: string;
+  flowId: string;
+  conflicts: ConflictFlag[];
+};
 
+// Finalize — forges the Twin, persists to Supabase, closes the trace bus.
 export type FinalizeRequest = { sessionId: string };
-export type FinalizeResponse = { twinId: string; twin: TwinSpec };
+export type FinalizeResponse = {
+  twinId: string;
+  spec: TwinSpec;
+  traceEventCount: number;
+};
 
 // ---------------------------------------------------------------------------
 // Compatibility report — backend/src/domain/scoring.ts.
