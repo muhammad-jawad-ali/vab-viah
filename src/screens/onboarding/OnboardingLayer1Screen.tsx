@@ -24,7 +24,13 @@ import { ApiError } from '../../api/types';
 import type { Layer1Response } from '../../api/types';
 import { useAppStore } from '../../store/useAppStore';
 import { saveOnboardingState } from '../../api/onboardingState';
-import { StepHeader, handleExpiredSession, useOnboardingNav } from './_shared';
+import {
+  DevSkipLink,
+  StepHeader,
+  devSkipOnboarding,
+  handleExpiredSession,
+  useOnboardingNav,
+} from './_shared';
 
 type ChatTurn = {
   role: 'agent' | 'user';
@@ -121,7 +127,13 @@ export const OnboardingLayer1Screen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
         <View className="px-6 pt-2">
-          <StepHeader step={1} label="Chat with Layla" />
+          <StepHeader
+            step={1}
+            label="Chat with Layla"
+            rightSlot={
+              <DevSkipLink onSkip={() => devSkipOnboarding(navigation)} />
+            }
+          />
         </View>
 
         <ScrollView
