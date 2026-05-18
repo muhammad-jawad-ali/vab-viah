@@ -1,143 +1,155 @@
 import { create } from 'zustand';
 
-export interface UserProfile {
-  name: string;
-  gender: string;
-  age: string;
-  height: string;
-  city: string;
-  profession: string;
-  education: string;
-  isWaliMode: boolean;
-  waliPhone?: string;
-  sect?: string;
-  deenLevel?: string;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface Match {
+interface Match {
   id: string;
   name: string;
   blurAvatar: string;
   compatibility: number;
   tags: string[];
   status: 'new' | 'negotiating' | 'revealed';
-  age: number;
-  city: string;
-  profession: string;
 }
 
-export interface DebateMessage {
+interface DebateMessage {
   speaker: 'userTwin' | 'candidateTwin' | 'moderator';
   text: string;
 }
 
-interface AppState {
-  user: UserProfile | null;
-  matches: Match[];
-  isPremium: boolean;
-  debateLog: DebateMessage[];
-  currentMatchId: string | null;
-  setUserProfile: (profile: Partial<UserProfile>) => void;
-  toggleWaliMode: () => void;
-  setPremium: (val: boolean) => void;
-  updateMatchStatus: (matchId: string, status: Match['status']) => void;
-  setCurrentMatchId: (matchId: string | null) => void;
-  clearDebateLog: () => void;
-  addDebateMessage: (msg: DebateMessage) => void;
+interface TwinSpec {
+  twinId: string;
+  summary: string;
+  weights: Record<string, number>;
 }
 
+interface AppState {
+  // Auth
+  token: string | null;
+  userId: string | null;
+  phoneNumber: string | null;
+  isProfileComplete: boolean;
+  hasTwin: boolean;
+
+  // User
+  user: { name: string; isWaliMode: boolean } | null;
+
+  // Twin onboarding
+  twin: TwinSpec | null;
+  voiceTranscript: string;
+  scenarioAnswers: { scenarioId: string; choice: string }[];
+  isWaliModeEnabled: boolean;
+
+  // Matches & debate
+  matches: Match[];
+  isPremium: boolean;
+  activeMatchId: string | null;
+  debateLog: DebateMessage[];
+
+  // Meeting
+  activeMeetingId: string | null;
+  activeMeetingUrl: string | null;
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+  setAuth: (token: string, userId: string, meta: { isProfileComplete: boolean; hasTwin: boolean }) => void;
+  setPhoneNumber: (phone: string) => void;
+  setTwin: (twin: TwinSpec) => void;
+  setVoiceTranscript: (text: string) => void;
+  addScenarioAnswer: (answer: { scenarioId: string; choice: string }) => void;
+  setWaliModeEnabled: (enabled: boolean) => void;
+  toggleWaliMode: () => void;
+  setActiveMatch: (matchId: string) => void;
+  setMeeting: (meetingId: string, meetingUrl: string) => void;
+  setPremium: (val: boolean) => void;
+  logout: () => void;
+}
+
+// ─── Store ────────────────────────────────────────────────────────────────────
+
 export const useAppStore = create<AppState>((set) => ({
-  user: {
-    name: 'Ayesha Khan',
-    gender: 'Female',
-    age: '24',
-    height: "5'4\"",
-    city: 'Lahore',
-    profession: 'Clinical Psychologist',
-    education: 'MSc Clinical Psychology',
-    isWaliMode: false,
-    waliPhone: '',
-    sect: 'Sunni',
-    deenLevel: 'Practicing',
-  },
-  isPremium: false,
-  currentMatchId: null,
+  // Auth
+  token: null,
+  userId: null,
+  phoneNumber: null,
+  isProfileComplete: false,
+  hasTwin: false,
+
+  // User
+  user: { name: 'User', isWaliMode: false },
+
+  // Twin
+  twin: null,
+  voiceTranscript: '',
+  scenarioAnswers: [],
+  isWaliModeEnabled: false,
+
+  // Matches
   matches: [
-    {
-      id: '1',
-      name: 'Bilal Siddiqui',
-      blurAvatar: 'https://i.pravatar.cc/150?u=11',
-      compatibility: 94,
-      tags: ['Deen Aligned', 'Career Focused', 'Same Sect'],
-      status: 'new',
-      age: 27,
-      city: 'Karachi',
-      profession: 'Software Engineer'
-    },
-    {
-      id: '2',
-      name: 'Zainab Bibi',
-      blurAvatar: 'https://i.pravatar.cc/150?u=22',
-      compatibility: 88,
-      tags: ['Family Oriented', 'Joint Family Setup'],
-      status: 'new',
-      age: 24,
-      city: 'Lahore',
-      profession: 'Educator'
-    },
-    {
-      id: '3',
-      name: 'Hamza Malik',
-      blurAvatar: 'https://i.pravatar.cc/150?u=33',
-      compatibility: 82,
-      tags: ['Flexible Lifestyle', 'Sect Compatible'],
-      status: 'new',
-      age: 29,
-      city: 'Islamabad',
-      profession: 'Chartered Accountant'
-    },
-    { id: '4', name: 'Zainab F.', blurAvatar: 'https://i.pravatar.cc/150?u=44', compatibility: 78, tags: ['Teacher', 'Family-oriented'], status: 'new', age: 26, city: 'Lahore', profession: 'Teacher' },
-    { id: '5', name: 'Hassan K.', blurAvatar: 'https://i.pravatar.cc/150?u=55', compatibility: 60, tags: ['Banker', 'Extrovert'], status: 'new', age: 31, city: 'Karachi', profession: 'Banker' },
-    { id: '6', name: 'Fatima A.', blurAvatar: 'https://i.pravatar.cc/150?u=66', compatibility: 71, tags: ['Architect', 'Creative'], status: 'new', age: 28, city: 'Islamabad', profession: 'Architect' },
-    { id: '7', name: 'Usman R.', blurAvatar: 'https://i.pravatar.cc/150?u=77', compatibility: 85, tags: ['Engineer', 'Introvert'], status: 'new', age: 33, city: 'Lahore', profession: 'Engineer' },
-    { id: '8', name: 'Ayesha S.', blurAvatar: 'https://i.pravatar.cc/150?u=88', compatibility: 68, tags: ['Doctor', 'Ambitious'], status: 'new', age: 27, city: 'Karachi', profession: 'Doctor' },
-    { id: '9', name: 'Tariq M.', blurAvatar: 'https://i.pravatar.cc/150?u=99', compatibility: 55, tags: ['Sales', 'Frequent Traveler'], status: 'new', age: 34, city: 'Dubai', profession: 'Sales Manager' },
-    { id: '10', name: 'Zahra B.', blurAvatar: 'https://i.pravatar.cc/150?u=101', compatibility: 92, tags: ['Writer', 'Homebody'], status: 'new', age: 25, city: 'Islamabad', profession: 'Writer' },
-    { id: '11', name: 'Ali W.', blurAvatar: 'https://i.pravatar.cc/150?u=111', compatibility: 75, tags: ['Chef', 'Foodie'], status: 'new', age: 30, city: 'Lahore', profession: 'Chef' },
-    { id: '12', name: 'Sana H.', blurAvatar: 'https://i.pravatar.cc/150?u=121', compatibility: 81, tags: ['Lawyer', 'Activist'], status: 'new', age: 29, city: 'Karachi', profession: 'Lawyer' }
+    { id: '1', name: 'Ayesha K.', blurAvatar: 'https://i.pravatar.cc/150?u=1', compatibility: 94, tags: ['Deen Aligned', 'Career Focused'], status: 'new' },
+    { id: '2', name: 'Fatima Z.', blurAvatar: 'https://i.pravatar.cc/150?u=2', compatibility: 88, tags: ['Family Oriented', 'Same Sect'], status: 'new' },
   ],
+  isPremium: false,
+  activeMatchId: null,
+
+  // Debate log (default seed for screens that don't use route params)
   debateLog: [
-    { speaker: 'userTwin', text: 'Assalam o Alaikum. Career growth is extremely essential to me, and I wish to continue practice post-marriage.' },
-    { speaker: 'candidateTwin', text: 'Walaikum Assalam. I fully support professional career growth. Family balance is also crucial for me.' },
-    { speaker: 'moderator', text: 'Round 1: Career & Ambition. Strong alignment detected: Both value professional work with mutual support.' }
+    { speaker: 'userTwin', text: 'Career growth is essential. Relocation is acceptable if parity remains.' },
+    { speaker: 'candidateTwin', text: 'We prioritize family proximity, but are open to 1-2 years abroad.' },
+    { speaker: 'moderator', text: 'Friction point identified: Geography. Potential compromise mapped.' },
   ],
-  setUserProfile: (profile) =>
+
+  // Meeting
+  activeMeetingId: null,
+  activeMeetingUrl: null,
+
+  // ─── Action implementations ───────────────────────────────────────────────
+
+  setAuth: (token, userId, { isProfileComplete, hasTwin }) =>
+    set({ token, userId, isProfileComplete, hasTwin }),
+
+  setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
+
+  setTwin: (twin) => set({ twin, hasTwin: true }),
+
+  setVoiceTranscript: (voiceTranscript) => set({ voiceTranscript }),
+
+  addScenarioAnswer: (answer) =>
     set((state) => ({
-      user: state.user ? { ...state.user, ...profile } : {
-        name: '',
-        gender: 'Female',
-        age: '',
-        height: '',
-        city: '',
-        profession: '',
-        education: '',
-        isWaliMode: false,
-        ...profile
-      } as UserProfile
+      scenarioAnswers: [
+        ...state.scenarioAnswers.filter((a) => a.scenarioId !== answer.scenarioId),
+        answer,
+      ],
     })),
+
+  setWaliModeEnabled: (isWaliModeEnabled) =>
+    set({ isWaliModeEnabled }),
+
   toggleWaliMode: () =>
     set((state) => ({
-      user: state.user ? { ...state.user, isWaliMode: !state.user.isWaliMode } : null
+      user: state.user ? { ...state.user, isWaliMode: !state.user.isWaliMode } : null,
+      isWaliModeEnabled: !state.isWaliModeEnabled,
     })),
+
+  setActiveMatch: (activeMatchId) => set({ activeMatchId }),
+
+  setMeeting: (activeMeetingId, activeMeetingUrl) =>
+    set({ activeMeetingId, activeMeetingUrl }),
+
   setPremium: (isPremium) => set({ isPremium }),
-  updateMatchStatus: (matchId, status) =>
-    set((state) => ({
-      matches: state.matches.map((m) => (m.id === matchId ? { ...m, status } : m))
-    })),
-  setCurrentMatchId: (currentMatchId) => set({ currentMatchId }),
-  clearDebateLog: () => set({ debateLog: [] }),
-  addDebateMessage: (msg) =>
-    set((state) => ({
-      debateLog: [...state.debateLog, msg]
-    }))
+
+  logout: () =>
+    set({
+      token: null,
+      userId: null,
+      phoneNumber: null,
+      isProfileComplete: false,
+      hasTwin: false,
+      twin: null,
+      voiceTranscript: '',
+      scenarioAnswers: [],
+      isWaliModeEnabled: false,
+      activeMatchId: null,
+      activeMeetingId: null,
+      activeMeetingUrl: null,
+      user: { name: 'User', isWaliMode: false },
+    }),
 }));
