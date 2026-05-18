@@ -32,27 +32,26 @@ export const SettingsScreen = ({ navigation }: any) => {
           <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">Settings</Text>
         </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('BasicProfileSetup')}
-          className="bg-primary-dark p-6 rounded-t-[32px] border-b border-white/10 flex-row items-center"
-        >
+        <View className="bg-primary-dark p-6 rounded-t-[32px] border-b border-white/10 flex-row items-center">
           <View className="w-16 h-16 bg-surface/10 rounded-full border border-surface/20 items-center justify-center mr-4">
             <Text className="text-3xl">👤</Text>
           </View>
           <View className="flex-1">
             <Text className="text-secondary font-bold text-[10px] uppercase tracking-widest mb-1">Active Profile</Text>
             <Text className="text-surface font-serif text-2xl font-bold">{user?.name || 'User'}</Text>
-            <Text className="text-primary-light text-xs font-bold mt-1">Tap to edit details ➔</Text>
+            <Text className="text-primary-light text-xs font-bold mt-1">Synthesized from onboarding</Text>
           </View>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('TwinOnboarding')}
+        <TouchableOpacity
+          onPress={() =>
+            navigation.getParent()?.navigate('Onboarding', { screen: 'OnboardingLayer1' })
+          }
           className="bg-primary-dark/90 p-5 rounded-b-[32px] shadow-xl mb-8 flex-row items-center justify-between"
         >
           <View>
             <Text className="text-surface font-bold text-sm">Retrain AI Twin</Text>
-            <Text className="text-slate-400 text-xs">Redo the scenario cards</Text>
+            <Text className="text-slate-400 text-xs">Restart the 5-step onboarding</Text>
           </View>
           <Text className="text-xl">🔄</Text>
         </TouchableOpacity>

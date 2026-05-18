@@ -1,15 +1,26 @@
 import React from 'react';
+import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAppStore } from '../store/useAppStore';
 
 // Types
-import { RootStackParamList, MainTabsParamList, DiscoverStackParamList, MeetingStackParamList, ProfileStackParamList } from './types';
+import {
+  RootStackParamList,
+  MainTabsParamList,
+  DiscoverStackParamList,
+  MeetingStackParamList,
+  ProfileStackParamList,
+  OnboardingStackParamList,
+} from './types';
 
 // Auth & Onboarding
 import { SignupScreen } from '../screens/SignupScreen';
-import { ProfileSetupScreen } from '../screens/ProfileSetupScreen';
-import { TwinOnboardingScreen } from '../screens/TwinOnboardingScreen';
+import { OnboardingLayer1Screen } from '../screens/onboarding/OnboardingLayer1Screen';
+import { OnboardingLayer2Screen } from '../screens/onboarding/OnboardingLayer2Screen';
+import { OnboardingLayer3Screen } from '../screens/onboarding/OnboardingLayer3Screen';
+import { OnboardingWaliScreen } from '../screens/onboarding/OnboardingWaliScreen';
+import { OnboardingFinalizeScreen } from '../screens/onboarding/OnboardingFinalizeScreen';
 import { WaliDashboardScreen } from '../screens/WaliDashboardScreen';
 
 // Discovery & Gating
@@ -26,13 +37,13 @@ import { DisputeFormScreen } from '../screens/DisputeFormScreen';
 import { BlockModalScreen } from '../screens/BlockModalScreen';
 import { HelpDeskScreen } from '../screens/HelpDeskScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
-import { BasicProfileSetup } from '../screens/BasicProfileSetup';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 const Discover = createNativeStackNavigator<DiscoverStackParamList>();
 const Meeting = createNativeStackNavigator<MeetingStackParamList>();
 const Profile = createNativeStackNavigator<ProfileStackParamList>();
+const Onboarding = createNativeStackNavigator<OnboardingStackParamList>();
 
 const DiscoverStack = () => (
   <Discover.Navigator screenOptions={{ headerShown: false }}>
@@ -57,9 +68,37 @@ const ProfileStack = () => (
     <Profile.Screen name="Settings" component={SettingsScreen} />
     <Profile.Screen name="HelpDesk" component={HelpDeskScreen} />
     <Profile.Screen name="BlockModal" component={BlockModalScreen} />
-    <Profile.Screen name="BasicProfileSetup" component={BasicProfileSetup} />
   </Profile.Navigator>
 );
+
+// Onboarding sub-stack — back gestures disabled so the user can't accidentally
+// step out of the flow mid-Layer.
+const OnboardingStack = () => {
+  const lastLayer = useAppStore((s) => s.onboardingLastLayer);
+  const initial: keyof OnboardingStackParamList =
+    lastLayer >= 4
+      ? 'OnboardingFinalize'
+      : lastLayer === 3
+      ? 'OnboardingWali'
+      : lastLayer === 2
+      ? 'OnboardingLayer3'
+      : lastLayer === 1
+      ? 'OnboardingLayer2'
+      : 'OnboardingLayer1';
+
+  return (
+    <Onboarding.Navigator
+      initialRouteName={initial}
+      screenOptions={{ headerShown: false, gestureEnabled: false }}
+    >
+      <Onboarding.Screen name="OnboardingLayer1" component={OnboardingLayer1Screen} />
+      <Onboarding.Screen name="OnboardingLayer2" component={OnboardingLayer2Screen} />
+      <Onboarding.Screen name="OnboardingLayer3" component={OnboardingLayer3Screen} />
+      <Onboarding.Screen name="OnboardingWali" component={OnboardingWaliScreen} />
+      <Onboarding.Screen name="OnboardingFinalize" component={OnboardingFinalizeScreen} />
+    </Onboarding.Navigator>
+  );
+};
 
 // Custom Minimal Pure-View Icons
 const MatchesIcon = ({ focused }: { focused: boolean }) => (
@@ -134,8 +173,6 @@ const ProfileIcon = ({ focused }: { focused: boolean }) => (
   </View>
 );
 
-import { View } from 'react-native';
-
 const MainTabs = () => (
   <Tab.Navigator
     screenOptions={{
@@ -192,17 +229,27 @@ const MainTabs = () => (
 );
 
 export const AppNavigator = () => {
-  // App.tsx awaits loadAuth() before mounting, so by the time this renders
-  // the Zustand auth slice is hydrated. If a token exists we boot into Main
-  // (Session 2 will introduce a richer routing decision based on /twin/me).
+  // App.tsx awaits loadAuth() + the optional /twin/me call before mounting,
+  // so by the time this renders Zustand is fully hydrated. Routing decision:
+  //   - no token             → Signup
+  //   - token + hasTwin      → Main
+  //   - token + !hasTwin     → Onboarding (sub-stack picks layer by lastLayer)
   const token = useAppStore((s) => s.token);
-  const initialRouteName: keyof RootStackParamList = token ? 'Main' : 'Signup';
+  const hasTwin = useAppStore((s) => s.hasTwin);
+
+  const initialRouteName: keyof RootStackParamList = !token
+    ? 'Signup'
+    : hasTwin
+    ? 'Main'
+    : 'Onboarding';
 
   return (
-    <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName={initialRouteName}
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen name="Signup" component={SignupScreen} />
-      <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-      <Stack.Screen name="TwinOnboarding" component={TwinOnboardingScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingStack} />
       <Stack.Screen name="Main" component={MainTabs} />
     </Stack.Navigator>
   );

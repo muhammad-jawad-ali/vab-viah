@@ -75,6 +75,15 @@ export async function loadAuth(): Promise<{ token: string; userId: string | null
 export async function clearAuth(): Promise<void> {
   await deleteItem(TOKEN_KEY);
   await deleteItem(USER_ID_KEY);
+  // Onboarding sessions are tied to user_id on the backend; wipe local
+  // resume-state too so a new user/login doesn't get pointed at someone
+  // else's stale (now-404'd) sessionId.
+  try {
+    const { clearOnboardingState } = await import('./onboardingState');
+    await clearOnboardingState();
+  } catch {
+    // best-effort; logout() below still clears the Zustand mirror
+  }
   useAppStore.getState().logout();
 }
 

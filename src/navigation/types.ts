@@ -18,7 +18,6 @@ export type ProfileStackParamList = {
   Settings: undefined;
   HelpDesk: undefined;
   BlockModal: { matchId: string; matchName: string };
-  BasicProfileSetup: undefined;
 };
 
 export type MainTabsParamList = {
@@ -28,9 +27,18 @@ export type MainTabsParamList = {
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
 };
 
+// Onboarding flow — 4 layers + finalize. Each screen owns a slice of the
+// backend onboarding session (sessionId is persisted in Zustand, not routed).
+export type OnboardingStackParamList = {
+  OnboardingLayer1: undefined;
+  OnboardingLayer2: undefined;
+  OnboardingLayer3: undefined;
+  OnboardingWali: undefined;
+  OnboardingFinalize: undefined;
+};
+
 export type RootStackParamList = {
   Signup: undefined;
-  ProfileSetup: undefined;
-  TwinOnboarding: undefined;
+  Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
   Main: NavigatorScreenParams<MainTabsParamList>;
 };

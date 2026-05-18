@@ -1,4 +1,9 @@
 import { create } from 'zustand';
+import type { TwinSpec } from '../api/types';
+import type {
+  OnboardingPersistedLayer,
+  OnboardingPersistedState,
+} from '../api/onboardingState';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +21,9 @@ interface DebateMessage {
   text: string;
 }
 
-interface TwinSpec {
+// Legacy local-only twin summary shape preserved for screens that still read it.
+// The real backend Twin spec lives on `twinSpec`.
+interface LocalTwinSummary {
   twinId: string;
   summary: string;
   weights: Record<string, number>;
@@ -30,14 +37,22 @@ interface AppState {
   isProfileComplete: boolean;
   hasTwin: boolean;
 
+  // Persisted backend Twin spec (loaded via /twin/me after JWT rehydrate).
+  twinSpec: TwinSpec | null;
+
   // User
   user: { name: string; isWaliMode: boolean } | null;
 
-  // Twin onboarding
-  twin: TwinSpec | null;
+  // Twin onboarding (legacy local-only summary — kept for non-onboarding screens)
+  twin: LocalTwinSummary | null;
   voiceTranscript: string;
   scenarioAnswers: { scenarioId: string; choice: string }[];
   isWaliModeEnabled: boolean;
+
+  // Onboarding session (Session 2 — backend-driven flow)
+  onboardingSessionId: string | null;
+  onboardingLastLayer: OnboardingPersistedLayer;
+  onboardingAnsweredCardIds: string[];
 
   // Matches & debate
   matches: Match[];
@@ -61,11 +76,15 @@ interface AppState {
   // ─── Actions ───────────────────────────────────────────────────────────────
   setAuth: (token: string, userId: string, meta: { isProfileComplete: boolean; hasTwin: boolean }) => void;
   setPhoneNumber: (phone: string) => void;
-  setTwin: (twin: TwinSpec) => void;
+  setHasTwin: (hasTwin: boolean) => void;
+  setTwinSpec: (spec: TwinSpec | null) => void;
+  setTwin: (twin: LocalTwinSummary) => void;
   setVoiceTranscript: (text: string) => void;
   addScenarioAnswer: (answer: { scenarioId: string; choice: string }) => void;
   setWaliModeEnabled: (enabled: boolean) => void;
   toggleWaliMode: () => void;
+  setOnboardingState: (state: OnboardingPersistedState) => void;
+  clearOnboardingState: () => void;
   setActiveMatch: (matchId: string) => void;
   setMeeting: (meetingId: string, meetingUrl: string) => void;
   addMeeting: (meeting: {
@@ -92,15 +111,21 @@ export const useAppStore = create<AppState>((set) => ({
   phoneNumber: null,
   isProfileComplete: false,
   hasTwin: false,
+  twinSpec: null,
 
   // User
   user: { name: 'User', isWaliMode: false },
 
-  // Twin
+  // Twin (legacy summary)
   twin: null,
   voiceTranscript: '',
   scenarioAnswers: [],
   isWaliModeEnabled: false,
+
+  // Onboarding session
+  onboardingSessionId: null,
+  onboardingLastLayer: 0,
+  onboardingAnsweredCardIds: [],
 
   // Matches
   matches: [
@@ -110,7 +135,7 @@ export const useAppStore = create<AppState>((set) => ({
   isPremium: false,
   activeMatchId: null,
 
-  // Debate log (default seed for screens that don't use route params)
+  // Debate log
   debateLog: [
     { speaker: 'userTwin', text: 'Career growth is essential. Relocation is acceptable if parity remains.' },
     { speaker: 'candidateTwin', text: 'We prioritize family proximity, but are open to 1-2 years abroad.' },
@@ -138,6 +163,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
 
+  setHasTwin: (hasTwin) => set({ hasTwin }),
+
+  setTwinSpec: (twinSpec) => set({ twinSpec, hasTwin: twinSpec !== null }),
+
   setTwin: (twin) => set({ twin, hasTwin: true }),
 
   setVoiceTranscript: (voiceTranscript) => set({ voiceTranscript }),
@@ -158,6 +187,20 @@ export const useAppStore = create<AppState>((set) => ({
       user: state.user ? { ...state.user, isWaliMode: !state.user.isWaliMode } : null,
       isWaliModeEnabled: !state.isWaliModeEnabled,
     })),
+
+  setOnboardingState: ({ sessionId, lastLayer, answeredCardIds }) =>
+    set({
+      onboardingSessionId: sessionId,
+      onboardingLastLayer: lastLayer,
+      onboardingAnsweredCardIds: answeredCardIds,
+    }),
+
+  clearOnboardingState: () =>
+    set({
+      onboardingSessionId: null,
+      onboardingLastLayer: 0,
+      onboardingAnsweredCardIds: [],
+    }),
 
   setActiveMatch: (activeMatchId) => set({ activeMatchId }),
 
@@ -195,10 +238,14 @@ export const useAppStore = create<AppState>((set) => ({
       phoneNumber: null,
       isProfileComplete: false,
       hasTwin: false,
+      twinSpec: null,
       twin: null,
       voiceTranscript: '',
       scenarioAnswers: [],
       isWaliModeEnabled: false,
+      onboardingSessionId: null,
+      onboardingLastLayer: 0,
+      onboardingAnsweredCardIds: [],
       activeMatchId: null,
       activeMeetingId: null,
       activeMeetingUrl: null,

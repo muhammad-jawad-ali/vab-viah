@@ -19,6 +19,7 @@ import { api } from '../api/client';
 import { saveAuth } from '../api/auth';
 import { ApiError } from '../api/types';
 import { useAppStore } from '../store/useAppStore';
+import { loadOnboardingState } from '../api/onboardingState';
 
 const COUNTRY_CODES = [
   { code: '+92', country: 'Pakistan' },
@@ -74,9 +75,24 @@ export const SignupScreen = ({ navigation }: any) => {
     try {
       const res = await api.auth.otpVerify({ phone: e164, otp });
       await saveAuth(res.access_token, res.user_id);
-      // Session 2 will introduce twin-existence routing; for Session 1 we
-      // route through the existing onboarding screens.
-      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+
+      // Rehydrate any in-flight onboarding state so a returning user lands on
+      // the right layer if they'd previously paused mid-flow.
+      await loadOnboardingState();
+
+      // Decide post-verify destination: if /twin/me returns a spec we send the
+      // user straight to Main; otherwise into the onboarding sub-stack (which
+      // resumes at the last completed layer via OnboardingStack.initialRoute).
+      try {
+        const me = await api.twin.me();
+        useAppStore.getState().setTwinSpec(me.spec);
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } catch (twinErr) {
+        if (twinErr instanceof ApiError && twinErr.code === 'NOT_FOUND') {
+          useAppStore.getState().setHasTwin(false);
+        }
+        navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+      }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Verification failed. Please try again.';
       Alert.alert('Verify failed', msg);
