@@ -121,11 +121,11 @@ export const BasicProfileSetup = () => {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-50">
+    <ScrollView className="flex-1 bg-background">
       <View className="p-6">
         <View className="mb-8 mt-4 flex-row justify-between items-start">
           <View className="flex-1">
-            <Text className="text-3xl font-bold text-slate-800">Complete Your Profile</Text>
+            <Text className="text-3xl font-serif font-bold text-slate-800">Complete Your Profile</Text>
             <Text className="text-slate-500">Provide accurate details to find your perfect match.</Text>
           </View>
           <TouchableOpacity 

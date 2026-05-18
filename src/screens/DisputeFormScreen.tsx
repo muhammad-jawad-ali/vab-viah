@@ -1,62 +1,111 @@
 import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { MeetingStackParamList } from '../navigation/types';
 
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+type Props = {
+  navigation: NativeStackNavigationProp<MeetingStackParamList, 'DisputeForm'>;
+  route: RouteProp<MeetingStackParamList, 'DisputeForm'>;
+};
 
-export const DisputeFormScreen = ({ navigation }: any) => {
+const CATEGORIES = ['No-Show', 'Misrepresentation', 'Ghosting', 'Family Rejection', 'Other'] as const;
+type Category = (typeof CATEGORIES)[number];
+
+export const DisputeFormScreen = ({ navigation, route }: Props) => {
   const insets = useSafeAreaInsets();
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const { matchId, matchName } = route.params;
+  const [category, setCategory] = useState<Category | null>(null);
+  const [details, setDetails] = useState('');
 
-  const issues = ['No-show', 'Misrepresentation', 'Inappropriate Behavior', 'Ghosting', 'Other'];
+  const canSubmit = !!category && details.length > 10;
+
+  const handleSubmit = () => {
+    Alert.alert(
+      '🛡️ Dispute Filed',
+      `Your report regarding ${matchName} has been submitted. The Dispute Agent will review this within 24 hours. The user has been temporarily blocked.`,
+      [{
+        text: 'OK',
+        onPress: () =>
+          (navigation as any).getParent()?.navigate('ProfileTab', {
+            screen: 'BlockModal',
+            params: { matchId, matchName },
+          }),
+      }]
+    );
+  };
 
   return (
-    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
-      <ScrollView className="p-6">
-        
-        <View className="mb-8 mt-4 border-b border-danger/20 pb-6">
-          <Text className="text-danger font-bold text-xs uppercase tracking-[0.2em] mb-2">Safety & Trust</Text>
-          <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">File a Dispute</Text>
-          <Text className="text-slate-500 mt-2">Our human moderation team reviews all disputes within 2 hours.</Text>
+    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
+      <View className="bg-rose-50 border-b border-rose-100 px-4 py-2 flex-row items-center">
+        <View className="w-2 h-2 rounded-full bg-rose-500 mr-2" />
+        <Text className="text-rose-800 font-mono text-[9px] uppercase tracking-widest flex-1">
+          AG-TRACE // DISPUTE AGENT: COLLECTING REPORT · REPUTATION IMPACT PENDING
+        </Text>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mt-2 mb-6">
+          <Text className="text-rose-600 font-bold text-[10px] uppercase tracking-[0.25em] mb-1">Safety Report</Text>
+          <Text className="text-slate-900 font-serif text-3xl font-bold">File Dispute</Text>
+          <Text className="text-slate-500 text-sm mt-1">Regarding: {matchName}</Text>
         </View>
 
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">Category of Issue</Text>
-        <View className="flex-row flex-wrap gap-3 mb-8">
-          {issues.map(issue => (
-            <TouchableOpacity 
-              key={issue}
-              onPress={() => setSelectedIssue(issue)}
-              className={`px-4 py-3 rounded-xl border ${selectedIssue === issue ? 'bg-danger border-danger' : 'bg-white border-slate-200 shadow-sm'}`}
+        <View className="bg-rose-50 border border-rose-100 rounded-2xl p-4 mb-6 flex-row items-start shadow-sm">
+          <Text className="text-lg mr-2">⚠️</Text>
+          <Text className="text-rose-800 text-xs leading-relaxed flex-1">
+            Filing a dispute will temporarily block this match and notify our Dispute Agent. Repeated false reports affect your own reputation score.
+          </Text>
+        </View>
+
+        <Text className="text-slate-700 font-bold text-sm mb-3">Issue Category</Text>
+        <View className="flex-row flex-wrap gap-2 mb-6">
+          {CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => setCategory(cat)}
+              className={`px-4 py-2 rounded-full border ${
+                category === cat
+                  ? 'bg-rose-50 border-rose-600'
+                  : 'bg-surface border-slate-200'
+              }`}
             >
-              <Text className={`font-bold text-sm ${selectedIssue === issue ? 'text-white' : 'text-slate-600'}`}>{issue}</Text>
+              <Text className={`font-bold text-xs ${category === cat ? 'text-rose-700' : 'text-slate-500'}`}>
+                {cat}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <View className="mb-8">
-          <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Incident Details</Text>
-          <TextInput 
-            className="bg-white border border-slate-200 rounded-2xl p-4 h-40 text-slate-800 shadow-sm"
-            placeholder="Please provide specific details..."
+        <View className="bg-surface border border-slate-200 shadow-sm rounded-2xl p-4 mb-6">
+          <Text className="text-slate-700 font-bold text-sm mb-3">Details</Text>
+          <TextInput
+            value={details}
+            onChangeText={setDetails}
+            placeholder="Describe the issue in detail. What happened?"
             placeholderTextColor="#94a3b8"
             multiline
+            numberOfLines={5}
             textAlignVertical="top"
+            className="text-slate-800 text-sm leading-relaxed"
+            style={{ minHeight: 120 }}
           />
         </View>
 
-        <View className="bg-danger/5 p-4 rounded-2xl border border-danger/10 mb-8 flex-row items-start">
-          <Text className="text-danger mr-3 mt-0.5">⚠️</Text>
-          <Text className="flex-1 text-danger text-xs leading-relaxed font-semibold">
-            Filing a false dispute violates our Terms of Service. If proven true, the offending party will face an immediate ban.
-          </Text>
-        </View>
-
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('BlockModal')}
-          className="bg-danger py-5 rounded-2xl items-center shadow-lg shadow-danger/20 mb-12"
+        <TouchableOpacity
+          disabled={!canSubmit}
+          onPress={handleSubmit}
+          className={`py-5 rounded-2xl items-center shadow-md ${canSubmit ? 'bg-rose-600 shadow-rose-600/10' : 'bg-slate-200'}`}
         >
-          <Text className="text-white font-bold text-sm tracking-widest uppercase">Submit & Block User</Text>
+          <Text className={`font-bold text-xs tracking-widest uppercase ${canSubmit ? 'text-surface' : 'text-slate-400'}`}>
+            Submit Dispute
+          </Text>
         </TouchableOpacity>
-
       </ScrollView>
     </View>
   );

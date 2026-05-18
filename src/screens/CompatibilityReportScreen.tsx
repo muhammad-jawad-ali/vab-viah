@@ -1,62 +1,147 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, Animated, Easing,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { DiscoverStackParamList } from '../navigation/types';
+import { REPORT_MAP } from '../api/mockData';
 
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+type Props = {
+  navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
+  route: RouteProp<DiscoverStackParamList, 'CompatibilityReport'>;
+};
 
-const Dim = ({ label, score }: { label: string, score: number }) => (
-  <View className="w-[48%] mb-6">
-    <View className="flex-row justify-between items-end mb-2">
-      <Text className="font-bold text-slate-700 text-xs uppercase">{label}</Text>
-      <Text className="font-mono text-primary font-bold text-xs">{score}%</Text>
-    </View>
-    <View className="h-1 bg-slate-200 rounded-full overflow-hidden">
-      <View style={{ width: `${score}%` }} className="h-full bg-primary" />
-    </View>
-  </View>
-);
+const DimensionBar = ({ label, score, delay }: { label: string; score: number; delay: number }) => {
+  const width = useRef(new Animated.Value(0)).current;
 
-export const CompatibilityReportScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
+  useEffect(() => {
+    Animated.timing(width, {
+      toValue: score,
+      duration: 800,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
+
   return (
-    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
-      <ScrollView className="p-6">
-        
-        <View className="items-center mb-10 mt-6">
-          <Text className="text-secondary font-bold text-[10px] uppercase tracking-[0.3em] mb-2">Analytical Report</Text>
-          <Text className="text-4xl font-serif font-bold text-slate-900 mb-2">Ayesha K.</Text>
-          <View className="bg-primary px-6 py-2 rounded-full">
-            <Text className="text-surface font-bold text-lg">94% Match</Text>
+    <View className="mb-5">
+      <View className="flex-row justify-between items-center mb-2">
+        <Text className="text-slate-300 font-bold text-xs uppercase tracking-wider">{label}</Text>
+        <Text style={{ color }} className="font-mono font-bold text-sm">{score}%</Text>
+      </View>
+      <View className="h-2 bg-slate-800 rounded-full overflow-hidden">
+        <Animated.View
+          style={{ width: width.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }), backgroundColor: color }}
+          className="h-full rounded-full"
+        />
+      </View>
+    </View>
+  );
+};
+
+export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
+  const insets = useSafeAreaInsets();
+  const { matchId, matchName, overallScore } = route.params;
+  const report = REPORT_MAP[matchId] ?? REPORT_MAP['match_002'];
+
+  const scoreAnim = useRef(new Animated.Value(0)).current;
+  const displayScore = useRef(0);
+  scoreAnim.addListener(({ value }) => { displayScore.current = Math.round(value); });
+
+  useEffect(() => {
+    Animated.timing(scoreAnim, {
+      toValue: report.overallScore,
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const rec = report.recommendation;
+  const recColor = rec === 'strong_match' ? '#10b981' : rec === 'conditional_match' ? '#f59e0b' : '#ef4444';
+  const recLabel = rec === 'strong_match' ? '✅ Strong Match' : rec === 'conditional_match' ? '⚠️ Conditional Match' : '❌ Not Recommended';
+
+  const DIMS: Array<keyof typeof report.dimensions> = ['deen','family','career','finances','kids','conflict','geography','boundaries'];
+  const DIM_LABELS: Record<string, string> = { deen:'Deen', family:'Family', career:'Career', finances:'Finances', kids:'Kids', conflict:'Conflict', geography:'Geography', boundaries:'Boundaries' };
+
+  return (
+    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
+      {/* AG-Trace */}
+      <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
+        <View className="w-2 h-2 rounded-full bg-emerald-600 mr-2" />
+        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1" numberOfLines={1}>
+          AG-TRACE // MODERATOR: REPORT GENERATED · 8-DIM ANALYSIS COMPLETE · REASONING LOGGED
+        </Text>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Overall score hero */}
+        <View className="items-center my-6">
+          <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mb-1">Compatibility Report</Text>
+          <Text className="text-slate-900 font-serif text-2xl font-bold mb-4">{matchName}</Text>
+          <View className="w-32 h-32 rounded-full bg-emerald-50 border-4 border-emerald-600/30 items-center justify-center mb-4">
+            <Animated.Text className="text-emerald-800 font-bold text-4xl">
+              {report.overallScore}%
+            </Animated.Text>
+          </View>
+          <View style={{ backgroundColor: recColor + '20', borderColor: recColor + '60' }} className="px-4 py-1.5 rounded-full border">
+            <Text style={{ color: recColor }} className="font-bold text-xs">{recLabel}</Text>
           </View>
         </View>
 
-        <View className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 mb-6">
-          <Text className="text-slate-900 font-serif text-xl font-bold mb-6">8-Dimension Breakdown</Text>
-          <View className="flex-row flex-wrap justify-between">
-            <Dim label="Deen" score={98} />
-            <Dim label="Family" score={90} />
-            <Dim label="Career" score={85} />
-            <Dim label="Finances" score={92} />
-            <Dim label="Kids" score={88} />
-            <Dim label="Conflict" score={95} />
-            <Dim label="Geography" score={75} />
-            <Dim label="Boundaries" score={100} />
-          </View>
+        {/* 8-Dimension Breakdown */}
+        <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-5">
+          <Text className="text-slate-800 font-serif text-base font-bold mb-5">8-Dimension Breakdown</Text>
+          {DIMS.map((dim, i) => (
+            <DimensionBar key={dim} label={DIM_LABELS[dim]} score={report.dimensions[dim]} delay={i * 80} />
+          ))}
         </View>
 
-        <View className="bg-primary-dark p-6 rounded-[32px] shadow-lg mb-8">
-          <Text className="text-secondary font-bold text-xs uppercase tracking-widest mb-4">Top Friction Point</Text>
-          <Text className="text-surface font-serif text-sm leading-relaxed italic">
-            "Candidate prefers staying in Islamabad long-term, while you indicated a 60% probability of moving to Dubai. The moderator agent noted this requires careful alignment during the first meeting."
+        {/* Top Strengths */}
+        <View className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-4 shadow-sm">
+          <Text className="text-emerald-800 font-bold text-xs uppercase tracking-widest mb-3">Top Strengths</Text>
+          {report.topStrengths.map((s, i) => (
+            <View key={i} className="flex-row items-start mb-2">
+              <Text className="text-emerald-700 mr-2 text-sm">✓</Text>
+              <Text className="text-emerald-800/80 text-sm flex-1">{s}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Friction Point */}
+        <View className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 shadow-sm">
+          <Text className="text-amber-800 font-bold text-xs uppercase tracking-widest mb-2">
+            {rec === 'not_recommended' ? '🚫 Dealbreaker' : '⚠️ Friction Point'}
+          </Text>
+          <Text className="text-amber-800/80 text-sm leading-relaxed italic">
+            "{report.frictionPoint}"
           </Text>
         </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Booking')}
-          className="bg-secondary py-5 rounded-2xl items-center shadow-lg shadow-secondary/20 mb-12"
+        {/* CTAs */}
+        {rec !== 'not_recommended' && (
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.navigate('MeetingsTab', { screen: 'Booking', params: { matchId, matchName } })}
+            className="bg-primary py-5 rounded-2xl items-center mb-3 shadow-lg shadow-primary/20"
+          >
+            <Text className="text-surface font-bold text-xs tracking-widest uppercase">Initiate Halal Reveal</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          onPress={() => navigation.getParent()?.navigate('MeetingsTab', { screen: 'DisputeForm', params: { matchId, matchName } })}
+          className="border border-rose-200 bg-rose-50/50 py-4 rounded-2xl items-center"
         >
-          <Text className="text-primary-dark font-bold text-sm tracking-widest uppercase">Initiate Mutual Reveal</Text>
+          <Text className="text-rose-700 font-bold text-xs tracking-widest uppercase">Report Issue</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </View>
   );

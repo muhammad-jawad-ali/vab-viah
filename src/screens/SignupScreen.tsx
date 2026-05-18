@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Modal, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Modal, ScrollView, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COUNTRY_CODES = [
@@ -79,7 +79,13 @@ export const SignupScreen = ({ navigation }: any) => {
             )}
 
             <TouchableOpacity 
-              onPress={() => otpSent ? navigation.navigate('ProfileSetup') : setOtpSent(true)}
+              onPress={() => {
+                if (!otpSent && phoneNumber.trim().length < 7) {
+                  Alert.alert('Phone number required', 'Please enter a valid phone number to continue.');
+                  return;
+                }
+                otpSent ? navigation.navigate('ProfileSetup') : setOtpSent(true);
+              }}
               className="bg-secondary rounded-2xl py-5 items-center shadow-lg shadow-secondary/30 mt-2"
             >
               <Text className="text-primary-dark font-bold text-sm tracking-widest uppercase">

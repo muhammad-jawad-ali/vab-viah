@@ -1,7 +1,6 @@
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 
 const FAQItem = ({ q, a }: { q: string, a: string }) => (
   <View className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-4">
@@ -21,7 +20,10 @@ export const HelpDeskScreen = () => {
           <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">Help Desk</Text>
         </View>
 
-        <TouchableOpacity className="bg-primary py-5 rounded-2xl items-center shadow-lg shadow-primary/20 mb-8 flex-row justify-center">
+        <TouchableOpacity
+          onPress={() => Alert.alert('Human Agent', 'Our support team will contact you on your registered phone number within 24 hours. For urgent matters, WhatsApp: +92 300 0000000', [{ text: 'OK' }])}
+          className="bg-primary py-5 rounded-2xl items-center shadow-lg shadow-primary/20 mb-8 flex-row justify-center"
+        >
           <Text className="text-xl mr-3">💬</Text>
           <Text className="text-surface font-bold text-sm tracking-widest uppercase">Chat with Human Agent</Text>
         </TouchableOpacity>

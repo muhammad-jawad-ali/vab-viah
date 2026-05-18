@@ -1,15 +1,30 @@
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { useAppStore } from '../store/useAppStore';
 
 export const PaywallScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
+  const { setPremium } = useAppStore();
+
+  const handleSubscribe = () => {
+    setPremium(true);
+    navigation.navigate('Main');
+  };
+
+  const handleSkip = () => {
+    navigation.goBack();
+  };
   return (
     <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-primary-dark">
       <ScrollView className="p-6">
-        
-        <View className="items-center mt-12 mb-12">
+
+        {/* Skip button */}
+        <TouchableOpacity onPress={handleSkip} className="self-end mt-2 mb-2 px-3 py-2">
+          <Text className="text-surface/40 font-bold text-xs uppercase tracking-widest">Maybe Later ✕</Text>
+        </TouchableOpacity>
+
+        <View className="items-center mt-4 mb-12">
           <Text className="text-secondary font-serif text-5xl mb-4">Lab Viah</Text>
           <Text className="text-primary-light font-bold text-xs uppercase tracking-widest text-center">
             Unlock the ultimate Halal matchmaking engine.
@@ -32,7 +47,7 @@ export const PaywallScreen = ({ navigation }: any) => {
           </View>
 
           <TouchableOpacity 
-            onPress={() => navigation.navigate('Main')}
+            onPress={handleSubscribe}
             className="bg-secondary py-4 rounded-2xl items-center shadow-lg shadow-secondary/30"
           >
             <Text className="text-primary-dark font-bold text-sm tracking-widest uppercase">Subscribe Now</Text>

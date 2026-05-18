@@ -1,67 +1,104 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { MeetingStackParamList } from '../navigation/types';
 
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+type Props = {
+  navigation: NativeStackNavigationProp<MeetingStackParamList, 'FeedbackSurvey'>;
+  route: RouteProp<MeetingStackParamList, 'FeedbackSurvey'>;
+};
 
-const Rating = ({ label }: { label: string }) => (
+const StarRating = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) => (
   <View className="mb-6">
-    <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">{label}</Text>
-    <View className="flex-row justify-between">
-      {[1, 2, 3, 4, 5].map(star => (
-        <TouchableOpacity key={star} className="w-12 h-12 bg-white rounded-xl border border-slate-200 items-center justify-center shadow-sm">
-          <Text className="text-lg opacity-50">⭐</Text>
+    <Text className="text-slate-700 font-semibold text-sm mb-3">{label}</Text>
+    <View className="flex-row gap-3">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <TouchableOpacity key={star} onPress={() => onChange(star)}>
+          <Text style={{ fontSize: 28, opacity: star <= value ? 1 : 0.25 }}>⭐</Text>
         </TouchableOpacity>
       ))}
     </View>
   </View>
 );
 
-export const FeedbackSurveyScreen = ({ navigation }: any) => {
+export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
   const insets = useSafeAreaInsets();
+  const { meetingId } = route.params;
+  const [chemistry, setChemistry] = useState(0);
+  const [values, setValues] = useState(0);
+  const [twinAccuracy, setTwinAccuracy] = useState(0);
+  const [notes, setNotes] = useState('');
+
+  const canSubmit = chemistry > 0 && values > 0 && twinAccuracy > 0;
+
+  const handleSubmit = () => {
+    Alert.alert(
+      '🤖 Twin Recalibrated',
+      'Your feedback has been processed. Your AI Twin has updated its matching weights for future negotiations.',
+      [{ text: 'Back to Matches', onPress: () => navigation.getParent()?.navigate('DiscoverTab') }]
+    );
+  };
+
   return (
-    <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
-      <ScrollView className="p-6">
-        
-        <View className="items-center mb-10 mt-6">
-          <View className="w-16 h-16 bg-primary-light/10 rounded-full items-center justify-center mb-4">
-            <Text className="text-2xl">📝</Text>
-          </View>
-          <Text className="text-secondary font-bold text-[10px] uppercase tracking-[0.3em] mb-2">Twin calibration</Text>
-          <Text className="text-3xl font-serif font-bold text-slate-900 text-center leading-tight">Post-Meeting Assessment</Text>
+    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
+      <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
+        <View className="w-2 h-2 rounded-full bg-emerald-600 mr-2" />
+        <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1">
+          AG-TRACE // TWIN FORGE: RECALIBRATING WEIGHTS FROM FEEDBACK · MEETING {meetingId}
+        </Text>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mt-2 mb-8">
+          <Text className="text-primary font-bold text-[10px] uppercase tracking-[0.25em] mb-1">Post-Meeting</Text>
+          <Text className="text-slate-900 font-serif text-3xl font-bold">Rate Your Experience</Text>
+          <Text className="text-slate-500 text-sm mt-1">Your feedback trains your AI Twin for better future matches.</Text>
         </View>
 
-        <View className="bg-primary/5 p-4 rounded-2xl border border-primary/10 mb-8">
-          <Text className="text-primary-dark font-serif text-sm italic text-center">
-            "Your feedback directly trains your AI Twin for future negotiations."
-          </Text>
+        <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-6">
+          <StarRating label="Chemistry & Connection" value={chemistry} onChange={setChemistry} />
+          <StarRating label="Shared Values Alignment" value={values} onChange={setValues} />
+          <StarRating label="Twin Accuracy (did it represent you well?)" value={twinAccuracy} onChange={setTwinAccuracy} />
         </View>
 
-        <Rating label="Overall Chemistry" />
-        <Rating label="Values Alignment" />
-        <Rating label="Twin Accuracy" />
-
-        <View className="mb-8 mt-4">
-          <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Private Notes</Text>
-          <TextInput 
-            className="bg-white border border-slate-200 rounded-2xl p-4 h-32 text-slate-800 shadow-sm"
-            placeholder="Share detailed thoughts with your Twin..."
+        <View className="bg-surface border border-slate-200 shadow-sm rounded-2xl p-4 mb-6">
+          <Text className="text-slate-700 font-bold text-sm mb-3">Private Notes</Text>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="How did the meeting go? These notes are private and help improve your Twin..."
             placeholderTextColor="#94a3b8"
             multiline
+            numberOfLines={4}
             textAlignVertical="top"
+            className="text-slate-800 text-sm leading-relaxed"
+            style={{ minHeight: 100 }}
           />
         </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Main')}
-          className="bg-primary py-5 rounded-2xl items-center shadow-xl shadow-primary/20 mb-4"
+        <TouchableOpacity
+          disabled={!canSubmit}
+          onPress={handleSubmit}
+          className={`py-5 rounded-2xl items-center shadow-md ${canSubmit ? 'bg-primary shadow-primary/10' : 'bg-slate-200'}`}
         >
-          <Text className="text-surface font-bold text-sm tracking-widest uppercase">Submit Calibration</Text>
+          <Text className={`font-bold text-xs tracking-widest uppercase ${canSubmit ? 'text-surface' : 'text-slate-400'}`}>
+            Submit Feedback
+          </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('DisputeForm')} className="py-4 items-center">
-          <Text className="text-danger font-bold text-xs tracking-widest uppercase">Report an Issue</Text>
-        </TouchableOpacity>
-
       </ScrollView>
     </View>
   );
