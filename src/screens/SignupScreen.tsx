@@ -29,10 +29,18 @@ export const SignupScreen = ({ navigation }: any) => {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
         >
           
-          <View className="mt-8">
-            <Text className="text-secondary font-serif italic text-lg mb-2">Bismillah</Text>
-            <Text className="text-surface font-serif text-5xl mb-4 font-bold tracking-tight">Lab Viah.</Text>
-            <Text className="text-primary-light text-sm font-bold tracking-widest uppercase">Halal • Agentic • Automated</Text>
+          <View className="mt-8 flex-row justify-between items-start w-full">
+            <View className="flex-1 pr-4">
+              <Text className="text-secondary font-serif italic text-lg mb-2">Bismillah</Text>
+              <Text className="text-surface font-serif text-5xl mb-4 font-bold tracking-tight">Lab Viah.</Text>
+              <Text className="text-primary-light text-sm font-bold tracking-widest uppercase">Halal • Agentic • Automated</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Main')}
+              className="bg-emerald-900/50 border border-emerald-500/20 px-4 py-2 rounded-full mt-2"
+            >
+              <Text className="text-secondary text-[11px] font-bold tracking-wider uppercase">Skip ➔</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Added pb-10 here to give the button a huge gap above the keyboard */}

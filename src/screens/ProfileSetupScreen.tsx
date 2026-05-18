@@ -112,13 +112,17 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
     <View style={{ paddingTop: insets.top, paddingBottom: insets.bottom }} className="flex-1 bg-background">
       <ScrollView className="px-6" keyboardShouldPersistTaps="handled">
 
-        <View className="mt-8 mb-4 border-b border-secondary/20 pb-6 flex-row justify-between items-end">
-          <View>
-            <Text className="text-secondary font-bold text-xs uppercase tracking-[0.2em] mb-2">Step 1 of 2</Text>
-            <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">Your Details</Text>
+        <View className="mt-8 mb-4 border-b border-slate-100 pb-6 flex-row justify-between items-start">
+          <View className="flex-1 pr-4">
+            <Text className="text-amber-600 font-bold text-xs uppercase tracking-[0.2em] mb-2">Step 1 of 2</Text>
+            <Text className="text-4xl font-serif font-bold text-slate-900 leading-tight">Your Profile Details</Text>
+            <Text className="text-slate-400 text-xs mt-2 font-serif italic">This will form the foundational core values of your AI Twin.</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('TwinOnboarding')} className="pb-1">
-            <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest">Skip ›</Text>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('TwinOnboarding')}
+            className="bg-slate-100 border border-slate-200 px-4 py-2 rounded-full mt-2"
+          >
+            <Text className="text-emerald-800 text-[11px] font-bold tracking-wider uppercase">Skip ➔</Text>
           </TouchableOpacity>
         </View>
 

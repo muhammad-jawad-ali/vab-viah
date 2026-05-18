@@ -216,16 +216,21 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
 
         {/* Progress + Skip */}
         <View className="flex-row justify-between items-center mt-4 mb-10">
-          <Text className="text-secondary font-bold text-[10px] tracking-[0.2em] uppercase">Phase {step} of 3</Text>
+          <View>
+            <Text className="text-amber-500 font-bold text-[10px] tracking-[0.2em] uppercase font-mono">Phase {step} of 3</Text>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Main')}
+              className="mt-1"
+            >
+              <Text className="text-emerald-400 text-[10px] font-bold tracking-wider uppercase underline">Skip Onboarding ➔</Text>
+            </TouchableOpacity>
+          </View>
           <View className="flex-row items-center gap-4">
             <View className="flex-row gap-2">
               {[1, 2, 3].map((s) => (
                 <View key={s} className={`h-1 w-8 rounded-full ${step >= s ? 'bg-secondary' : 'bg-primary'}`} />
               ))}
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Main')} className="pl-3">
-              <Text className="text-surface/30 font-bold text-[10px] uppercase tracking-widest">Skip ›</Text>
-            </TouchableOpacity>
           </View>
         </View>
 

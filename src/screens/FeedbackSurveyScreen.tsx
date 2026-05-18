@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { MeetingStackParamList } from '../navigation/types';
+import { useAppStore } from '../store/useAppStore';
 
 type Props = {
   navigation: NativeStackNavigationProp<MeetingStackParamList, 'FeedbackSurvey'>;
@@ -38,14 +39,26 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
   const [values, setValues] = useState(0);
   const [twinAccuracy, setTwinAccuracy] = useState(0);
   const [notes, setNotes] = useState('');
+  
+  const { meetingsList, completeMeeting, setMeetingStatus } = useAppStore();
+  const currentMeeting = meetingsList.find((m) => m.id === meetingId);
+  const matchName = currentMeeting?.matchName || 'Your Match';
 
   const canSubmit = chemistry > 0 && values > 0 && twinAccuracy > 0;
 
   const handleSubmit = () => {
+    completeMeeting(meetingId);
+    navigation.goBack();
+  };
+
+  const handleRateLater = () => {
+    if (meetingId) {
+      setMeetingStatus(meetingId, 'pending_feedback');
+    }
     Alert.alert(
-      '🤖 Twin Recalibrated',
-      'Your feedback has been processed. Your AI Twin has updated its matching weights for future negotiations.',
-      [{ text: 'Back to Matches', onPress: () => navigation.getParent()?.navigate('DiscoverTab') }]
+      '⚠️ Postponed Calibration',
+      `You have opted to rate your meeting with ${matchName} later. You can access it anytime under the Meetings Log.`,
+      [{ text: 'Okay', onPress: () => navigation.goBack() }]
     );
   };
 
@@ -54,7 +67,7 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
       <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 flex-row items-center">
         <View className="w-2 h-2 rounded-full bg-emerald-600 mr-2" />
         <Text className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1">
-          AG-TRACE // TWIN FORGE: RECALIBRATING WEIGHTS FROM FEEDBACK · MEETING {meetingId}
+          AG-TRACE // TWIN FORGE: RECALIBRATING WEIGHTS FROM FEEDBACK · MEETING WITH {matchName.toUpperCase()}
         </Text>
       </View>
 
@@ -64,9 +77,9 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-2 mb-8">
-          <Text className="text-primary font-bold text-[10px] uppercase tracking-[0.25em] mb-1">Post-Meeting</Text>
+          <Text className="text-primary font-bold text-[10px] uppercase tracking-[0.25em] mb-1">Post-Meeting with {matchName}</Text>
           <Text className="text-slate-900 font-serif text-3xl font-bold">Rate Your Experience</Text>
-          <Text className="text-slate-500 text-sm mt-1">Your feedback trains your AI Twin for better future matches.</Text>
+          <Text className="text-slate-500 text-sm mt-1">Your feedback trains your AI Twin for better future matches with {matchName}.</Text>
         </View>
 
         <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-6">
@@ -97,6 +110,15 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
         >
           <Text className={`font-bold text-xs tracking-widest uppercase ${canSubmit ? 'text-surface' : 'text-slate-400'}`}>
             Submit Feedback
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleRateLater}
+          className="mt-4 py-4 rounded-2xl items-center border border-slate-300 bg-transparent"
+        >
+          <Text className="text-slate-600 font-bold text-xs tracking-widest uppercase">
+            Skip & Rate Later
           </Text>
         </TouchableOpacity>
       </ScrollView>

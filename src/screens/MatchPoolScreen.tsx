@@ -40,11 +40,19 @@ const MatchCard = ({
   onPress: () => void;
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const { meetingsList } = useAppStore();
 
   const handlePressIn = () =>
     Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start();
   const handlePressOut = () =>
     Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+
+  // Check if a reveal is unlocked (i.e. a meeting is scheduled, pending, or completed)
+  const isRevealed = meetingsList.some(
+    (m) =>
+      m.id === `meet_${match.matchId}` &&
+      (m.status === 'scheduled' || m.status === 'done' || m.status === 'pending_feedback')
+  );
 
   return (
     <Animated.View style={{ transform: [{ scale }] }} className="mb-5">
@@ -60,11 +68,17 @@ const MatchCard = ({
           <Image
             source={{ uri: match.blurAvatarUrl }}
             className="w-full h-full"
-            blurRadius={12}
+            blurRadius={isRevealed ? 0 : 12}
           />
-          <View className="absolute inset-0 items-center justify-center">
-            <Text className="text-2xl">👤</Text>
-          </View>
+          {!isRevealed ? (
+            <View className="absolute inset-0 bg-black/5 items-center justify-center">
+              <Text className="text-xl">🔒</Text>
+            </View>
+          ) : (
+            <View className="absolute bottom-0 left-0 right-0 bg-emerald-600/90 py-0.5 items-center">
+              <Text className="text-[7px] font-bold text-white uppercase tracking-wider">Revealed</Text>
+            </View>
+          )}
         </View>
 
         {/* Info */}

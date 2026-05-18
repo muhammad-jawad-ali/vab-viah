@@ -48,6 +48,15 @@ interface AppState {
   // Meeting
   activeMeetingId: string | null;
   activeMeetingUrl: string | null;
+  meetingsList: {
+    id: string;
+    matchName: string;
+    slotDay: string;
+    slotTime: string;
+    type: string;
+    location?: string;
+    status: 'scheduled' | 'pending_feedback' | 'done';
+  }[];
 
   // ─── Actions ───────────────────────────────────────────────────────────────
   setAuth: (token: string, userId: string, meta: { isProfileComplete: boolean; hasTwin: boolean }) => void;
@@ -59,6 +68,17 @@ interface AppState {
   toggleWaliMode: () => void;
   setActiveMatch: (matchId: string) => void;
   setMeeting: (meetingId: string, meetingUrl: string) => void;
+  addMeeting: (meeting: {
+    id: string;
+    matchName: string;
+    slotDay: string;
+    slotTime: string;
+    type: string;
+    location?: string;
+    status: 'scheduled' | 'pending_feedback' | 'done';
+  }) => void;
+  completeMeeting: (meetingId: string) => void;
+  setMeetingStatus: (meetingId: string, status: 'scheduled' | 'pending_feedback' | 'done') => void;
   setPremium: (val: boolean) => void;
   logout: () => void;
 }
@@ -100,6 +120,16 @@ export const useAppStore = create<AppState>((set) => ({
   // Meeting
   activeMeetingId: null,
   activeMeetingUrl: null,
+  meetingsList: [
+    {
+      id: 'meet_past_1',
+      matchName: 'Fatima Z.',
+      slotDay: 'Last Friday',
+      slotTime: '08:00 PM',
+      type: 'Virtual',
+      status: 'done',
+    }
+  ],
 
   // ─── Action implementations ───────────────────────────────────────────────
 
@@ -134,6 +164,28 @@ export const useAppStore = create<AppState>((set) => ({
   setMeeting: (activeMeetingId, activeMeetingUrl) =>
     set({ activeMeetingId, activeMeetingUrl }),
 
+  addMeeting: (meeting) =>
+    set((state) => ({
+      meetingsList: [
+        ...state.meetingsList.filter((m) => m.id !== meeting.id),
+        meeting,
+      ],
+    })),
+
+  completeMeeting: (meetingId) =>
+    set((state) => ({
+      meetingsList: state.meetingsList.map((m) =>
+        m.id === meetingId ? { ...m, status: 'done' } : m
+      ),
+    })),
+
+  setMeetingStatus: (meetingId, status) =>
+    set((state) => ({
+      meetingsList: state.meetingsList.map((m) =>
+        m.id === meetingId ? { ...m, status } : m
+      ),
+    })),
+
   setPremium: (isPremium) => set({ isPremium }),
 
   logout: () =>
@@ -150,6 +202,16 @@ export const useAppStore = create<AppState>((set) => ({
       activeMatchId: null,
       activeMeetingId: null,
       activeMeetingUrl: null,
+      meetingsList: [
+        {
+          id: 'meet_past_1',
+          matchName: 'Fatima Z.',
+          slotDay: 'Last Friday',
+          slotTime: '08:00 PM',
+          type: 'Virtual',
+          status: 'done',
+        }
+      ],
       user: { name: 'User', isWaliMode: false },
     }),
 }));

@@ -130,7 +130,10 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
         {/* CTAs */}
         {rec !== 'not_recommended' && (
           <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('MeetingsTab', { screen: 'Booking', params: { matchId, matchName } })}
+            onPress={() => {
+              navigation.popToTop();
+              navigation.getParent()?.navigate('MeetingsTab', { screen: 'Booking', params: { matchId, matchName } });
+            }}
             className="bg-primary py-5 rounded-2xl items-center mb-3 shadow-lg shadow-primary/20"
           >
             <Text className="text-surface font-bold text-xs tracking-widest uppercase">Initiate Halal Reveal</Text>
