@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Switch, TextInput, ScrollView, Animated, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, Switch, TextInput, ScrollView, Animated, Alert, Easing } from 'react-native';
 import { AgTrace } from '../components/AgTrace';
 import { SafeScreen } from '../components/SafeScreen';
 import { useAppStore } from '../store/useAppStore';
@@ -19,24 +19,124 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
 
   const SCENARIOS = [
     {
-      title: "Career vs. Family",
-      text: "Your partner is offered a life-changing role abroad, but your parents rely on your physical presence at home. What do you do?",
-      optionA: "CAREER FOCUS",
-      optionB: "FAMILY LOYALTY",
+      title: 'Joint Family Living',
+      text: 'After marriage, your parents expect you to live in a joint family setup, but you have an opportunity to move to an independent home nearby. What do you do?',
+      options: ['STAY IN JOINT FAMILY', 'MOVE INDEPENDENTLY', 'COMPROMISE (NEARBY)', 'NOT SURE / SKIP'],
     },
     {
-      title: "Financial Outlook",
-      text: "Your partner wants to combine all finances into a joint account, but you prefer to keep your savings separate. How do you respond?",
-      optionA: "JOINT ACCOUNT",
-      optionB: "SEPARATE SAVINGS",
+      title: 'Financial Independence',
+      text: 'Your spouse earns well but expects you to hand over your savings for collective family investments (like buying a plot). Your stance?',
+      options: ['SHARE ALL SAVINGS', 'KEEP SEPARATE ACCOUNTS', 'PARTIAL CONTRIBUTION', 'NOT SURE / SKIP'],
     },
     {
-      title: "Conflict Style",
-      text: "After a heated argument, your partner prefers to be left alone for hours, but you want to resolve it immediately. What is your approach?",
-      optionA: "GIVE SPACE",
-      optionB: "RESOLVE NOW",
+      title: 'Conflict Resolution',
+      text: 'During a major disagreement, your spouse suggests involving the elders (parents/uncles) to mediate. You prefer to:',
+      options: ['WELCOME ELDER ADVICE', 'KEEP IT PRIVATE', 'ONLY IF UNAVOIDABLE', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Deen & Milad',
+      text: 'Your family regularly attends Milad or cultural religious gatherings, but your spouse considers them bid\'ah (innovation). You:',
+      options: ['STOP ATTENDING', 'ATTEND ALONE', 'DISCUSS SCHOLARLY VIEWS', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Family Expectations',
+      text: 'Right after the Nikah, the extended family starts asking "Khushkhabri kab hai?" (When is the good news?). You and your spouse:',
+      options: ['START A FAMILY ASAP', 'WAIT 1-2 YEARS', 'FOCUS ON CAREER FIRST', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Relocation & Visa',
+      text: 'Your spouse gets a work visa for the Middle East, but your aging parents in Pakistan need your support. You choose to:',
+      options: ['STAY IN PAKISTAN', 'MOVE TOGETHER', 'SPONSOR PARENTS LATER', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Social Boundaries',
+      text: 'Your spouse maintains close, casual friendships with colleagues of the opposite gender (going for lunches, etc). You feel:',
+      options: ['COMPLETELY FINE', 'PREFER STRICT HIJAB/BOUNDARIES', 'FINE IF PROFESSIONAL', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Career Post-Marriage',
+      text: 'Your spouse expects you to prioritize household duties over demanding work hours or business trips. You:',
+      options: ['WILLING TO STEP BACK', 'CAREER IS NON-NEGOTIABLE', 'FIND A MIDDLE GROUND', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'In-Laws Expectations',
+      text: 'Your mother-in-law expects you to cook traditional meals every day, despite both of you working full-time. You:',
+      options: ['AGREE TO HER WISHES', 'HIRE HELP / ORDER IN', 'SHARE COOKING DUTIES', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Kids & Culture',
+      text: 'When raising kids, what kind of schooling environment is most important to you?',
+      options: ['STRICT ISLAMIC SCHOOL', 'ELITE ENGLISH MEDIUM', 'BALANCED/HIFZ TRACK', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Wedding Extravagance',
+      text: 'Your family wants a grand, multi-day Shaadi with a huge guest list, but your spouse wants a simple Sunnah Walima. You lean towards:',
+      options: ['GRAND SHAADI', 'SIMPLE WALIMA ONLY', 'MODERATE / ONE EVENT', 'NOT SURE / SKIP'],
+    },
+    {
+      title: 'Core Values',
+      text: 'If you had to pick the absolute biggest red flag in a rishta, it would be:',
+      options: ['DISRESPECT TO PARENTS', 'LACK OF NAMAZ', 'CONTROLLING NATURE', 'NOT SURE / SKIP'],
     }
   ];
+
+  const DIMENSIONS = ['Deen', 'Family', 'Career', 'Finances', 'Kids', 'Conflict', 'Geography', 'Boundaries'];
+
+  const LiveRadar = ({ scenarioIndex }: { scenarioIndex: number }) => {
+    const animations = useRef(DIMENSIONS.map(() => new Animated.Value(0.1))).current;
+
+    useEffect(() => {
+      const toVals = DIMENSIONS.map((_, i) => {
+        const noise = Math.random() * 0.2;
+        const baseProgression = Math.min(1, (scenarioIndex + 1) / SCENARIOS.length);
+        return Math.min(1, baseProgression * 0.7 + noise);
+      });
+
+      Animated.parallel(
+        animations.map((anim, i) =>
+          Animated.timing(anim, {
+            toValue: toVals[i],
+            duration: 600,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+          })
+        )
+      ).start();
+    }, [scenarioIndex]);
+
+    return (
+      <View className="bg-slate-900 border border-emerald-500/50 rounded-[32px] p-5 mb-6 shadow-xl shadow-emerald-900/20">
+        <View className="flex-row items-center mb-5">
+          <Text className="text-[10px] uppercase font-bold text-slate-300 tracking-widest flex-1">
+            Live Personality Radar
+          </Text>
+          <View className="bg-emerald-500/20 px-2 py-1 rounded-md">
+            <Text className="text-[10px] text-emerald-400 font-mono font-bold uppercase">Updating...</Text>
+          </View>
+        </View>
+        <View className="flex-row flex-wrap justify-between">
+          {DIMENSIONS.map((dim, i) => (
+            <View key={dim} className="w-[48%] mb-4">
+              <View className="flex-row justify-between mb-1.5">
+                <Text className="text-[10px] uppercase font-extrabold text-white tracking-wider">{dim}</Text>
+              </View>
+              <View className="h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <Animated.View
+                  className="h-full bg-emerald-400 rounded-full"
+                  style={{
+                    width: animations[i].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%']
+                    })
+                  }}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   // Voice recording pulse animation
   useEffect(() => {
@@ -79,19 +179,7 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
   };
 
   const getTwinSummary = () => {
-    const p1 = choices[0] === 'CAREER FOCUS'
-      ? 'I advocate for career ambitions and professional parity, even if overseas travel is required.'
-      : 'I prioritize family ties and local roots, keeping close to parent elders.';
-      
-    const p2 = choices[1] === 'JOINT ACCOUNT'
-      ? 'I prefer shared financial transparency and joint management of household resources.'
-      : 'I believe in maintaining individual savings alongside joint household contribution.';
-
-    const p3 = choices[2] === 'GIVE SPACE'
-      ? 'My conflict style is reflective, preferring quiet space before structured resolution.'
-      : 'I seek to talk through misunderstandings immediately to prevent emotional distance.';
-
-    return `I represent ${user?.name || 'Ayesha Khan'}. ${p1} ${p2} ${p3} I highly value a ${user?.deenLevel?.toLowerCase() || 'practicing'} life setup.`;
+    return `I represent ${user?.name || 'Ayesha Khan'}. Based on ${choices.length} decisions, I highly value a ${user?.deenLevel?.toLowerCase() || 'practicing'} life setup. My responses lean towards practical compromise in cultural expectations.`;
   };
 
   return (
@@ -187,6 +275,8 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
               <Text className="text-white font-serif text-3xl mb-1 leading-tight">Moral Dimensions</Text>
               <Text className="text-emerald-400 text-xs uppercase tracking-wider mb-6 font-bold">Layer 2: Ethical Choice Scenarios</Text>
 
+              <LiveRadar scenarioIndex={scenarioIndex} />
+
               <View className="bg-white rounded-[32px] p-6 shadow-2xl shadow-black/20">
                 <View className="bg-amber-100 rounded-full px-4 py-1.5 self-center mb-6">
                   <Text className="text-amber-800 font-bold text-[10px] uppercase tracking-widest">{SCENARIOS[scenarioIndex].title}</Text>
@@ -197,23 +287,17 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
                 </Text>
 
                 <View className="gap-3">
-                  <TouchableOpacity 
-                    onPress={() => setSelectedOption('optionA')}
-                    className={`py-4 rounded-xl items-center border-2 ${selectedOption === 'optionA' ? 'bg-emerald-50 border-emerald-800' : 'bg-slate-50 border-slate-100'}`}
-                  >
-                    <Text className={`font-bold text-xs tracking-widest ${selectedOption === 'optionA' ? 'text-emerald-800' : 'text-slate-500'}`}>
-                      {SCENARIOS[scenarioIndex].optionA}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    onPress={() => setSelectedOption('optionB')}
-                    className={`py-4 rounded-xl items-center border-2 ${selectedOption === 'optionB' ? 'bg-emerald-50 border-emerald-800' : 'bg-slate-50 border-slate-100'}`}
-                  >
-                    <Text className={`font-bold text-xs tracking-widest ${selectedOption === 'optionB' ? 'text-emerald-800' : 'text-slate-500'}`}>
-                      {SCENARIOS[scenarioIndex].optionB}
-                    </Text>
-                  </TouchableOpacity>
+                  {SCENARIOS[scenarioIndex].options.map((opt, i) => (
+                    <TouchableOpacity 
+                      key={i}
+                      onPress={() => setSelectedOption(opt)}
+                      className={`py-4 rounded-xl items-center border-2 ${selectedOption === opt ? 'bg-emerald-50 border-emerald-800' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <Text className={`font-bold text-xs tracking-widest ${selectedOption === opt ? 'text-emerald-800' : 'text-slate-500'}`}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
 
@@ -257,9 +341,7 @@ export const TwinOnboardingScreen = ({ navigation }: any) => {
                 Alert.alert('Required Selection', 'Please choose one of the scenario outcomes to forge your twin.');
                 return;
               }
-              const choiceText = selectedOption === 'optionA' 
-                ? SCENARIOS[scenarioIndex].optionA 
-                : SCENARIOS[scenarioIndex].optionB;
+              const choiceText = selectedOption!;
               
               const updatedChoices = [...choices, choiceText];
               setChoices(updatedChoices);

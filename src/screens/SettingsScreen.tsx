@@ -54,7 +54,7 @@ export const SettingsScreen = ({ navigation }: any) => {
         {/* Profile Card */}
         <TouchableOpacity 
           onPress={() => navigation.navigate('BasicProfileSetup')}
-          className="bg-emerald-950 p-6 rounded-[28px] shadow-xl mb-6 flex-row items-center border border-emerald-900"
+          className="bg-emerald-950 p-6 rounded-[28px] shadow-xl mb-3 flex-row items-center border border-emerald-900"
         >
           <View className="w-14 h-14 bg-white/10 rounded-full border border-white/15 items-center justify-center mr-4">
             <Text className="text-2.5xl">👤</Text>
@@ -64,6 +64,17 @@ export const SettingsScreen = ({ navigation }: any) => {
             <Text className="text-white font-serif text-xl font-bold leading-none">{user?.name || 'Ayesha Khan'}</Text>
             <Text className="text-emerald-400 text-[10px] font-bold mt-1.5 uppercase tracking-wide">Edit Custom Specifications ➔</Text>
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('TwinOnboarding')}
+          className="bg-emerald-900 p-5 rounded-[28px] shadow-xl mb-6 flex-row items-center justify-between border border-emerald-800"
+        >
+          <View>
+            <Text className="text-white font-bold text-sm">Retrain AI Twin</Text>
+            <Text className="text-emerald-200/60 text-xs mt-0.5">Redo your ethical scenario cards</Text>
+          </View>
+          <Text className="text-xl">🔄</Text>
         </TouchableOpacity>
 
         {/* App Preferences */}
