@@ -243,9 +243,11 @@ export type DimensionScore = {
   friction_level: FrictionLevel;
 };
 
-export type CompatibilityReport = {
-  id: string;
-  user_twin_id: string;
+// Real shape persisted by find-matches.workplan.ts and returned by
+// GET /match/results/:flowId. Note: there is NO `id`, `user_twin_id`,
+// `flow_id`, or `candidate` field — `candidate_name` lives inside
+// `reasoning_trace`. The frontend's "displayName" comes from there.
+export type StoredReport = {
   candidate_twin_id: string;
   overall_score: number; // 0..1
   dimension_scores: Record<Dimension, DimensionScore>;
@@ -253,22 +255,31 @@ export type CompatibilityReport = {
   top_friction_points: string[];
   dealbreakers_hit: string[];
   recommendation: Recommendation;
-  reasoning_trace: unknown;
-  generated_at: string;
-  flow_id?: string;
-  candidate?: {
-    twinId: string;
-    name: string;
-    age: number;
-    city: string;
-    profession?: string;
+  reasoning_trace: {
+    candidate_name?: string;
+    prescreen_similarity?: number | null;
+    prescreen_penalty?: number | null;
+    duration_ms?: number;
+    budget_exceeded?: boolean;
+    dimensions_scored?: number;
+    [k: string]: unknown;
   };
+  generated_at: string;
 };
 
+// Legacy alias used internally; same row shape as StoredReport.
+export type CompatibilityReport = StoredReport;
+
 export type MatchRequestResponse = { flowId: string; streamUrl: string };
-export type MatchResultsResponse = { reports: CompatibilityReport[] };
+export type MatchResultsResponse = {
+  flowId: string;
+  topThree: StoredReport[];
+  allDebated: StoredReport[];
+};
+
 export type BaselineMatchResponse = {
-  ranking: { candidateTwinId: string; score: number; name?: string }[];
+  userTwinId: string;
+  ranking: { candidateId: string; candidateName: string; baselineScore: number }[];
 };
 
 // ---------------------------------------------------------------------------
@@ -437,26 +448,36 @@ export type FrontendMatch = {
   age: number;
   status: 'new' | 'negotiating' | 'revealed';
   recommendation: Recommendation;
+  topStrength?: string;
+  topFriction?: string;
+  dealbreakersHit: string[];
+  candidateTwinId: string;
 };
 
+// Real backend reports don't carry city/profession/age — those live only on
+// the candidate's TwinSpec which isn't sent back to the client today. Surface
+// the strongest narrative bits we DO get: top strength + top friction.
 export function toFrontendMatch(report: CompatibilityReport): FrontendMatch {
-  const c = report.candidate;
-  const name = c?.name ?? 'Candidate';
+  const name = report.reasoning_trace?.candidate_name ?? 'Candidate';
   const tags: string[] = [];
-  if (c?.profession) tags.push(c.profession);
-  if (c?.city) tags.push(c.city);
   if (report.dealbreakers_hit.length > 0) tags.push('Dealbreaker');
+  if (report.recommendation === 'strong_match') tags.push('Strong Match');
+  else if (report.recommendation === 'conditional_match') tags.push('Conditional');
 
   return {
     matchId: report.candidate_twin_id,
+    candidateTwinId: report.candidate_twin_id,
     displayName: name,
     blurAvatarUrl: `https://i.pravatar.cc/300?u=${encodeURIComponent(report.candidate_twin_id)}`,
     compatibilityScore: Math.round(report.overall_score * 100),
     tags,
-    city: c?.city ?? '',
-    profession: c?.profession ?? '',
-    age: c?.age ?? 0,
+    city: '',
+    profession: '',
+    age: 0,
     status: report.recommendation === 'not_recommended' ? 'new' : 'negotiating',
     recommendation: report.recommendation,
+    topStrength: report.top_strengths?.[0],
+    topFriction: report.top_friction_points?.[0],
+    dealbreakersHit: report.dealbreakers_hit,
   };
 }

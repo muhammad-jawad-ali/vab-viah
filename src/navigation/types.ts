@@ -2,8 +2,11 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 
 export type DiscoverStackParamList = {
   MatchPool: undefined;
-  TwinDebate: { matchId: string; matchName: string };
-  CompatibilityReport: { matchId: string; matchName: string; overallScore: number };
+  // flowId is the match_<uuid> returned by POST /match/request. The candidate
+  // twinId + display name carry through so the screens can fetch the right
+  // row from /match/results without an extra lookup.
+  TwinDebate: { flowId: string; candidateTwinId: string; displayName: string };
+  CompatibilityReport: { flowId: string; candidateTwinId: string; displayName: string };
   Paywall: undefined;
 };
 
