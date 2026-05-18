@@ -7,7 +7,7 @@
 //
 // Backend dispatches by presence of `corrections`, not a `mode` field.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -41,9 +41,16 @@ export const OnboardingLayer3Screen = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  // React 19 StrictMode double-invokes effects in dev. The Gemini call is
+  // expensive (a Layer-3 generate burns Pro budget + falls back to Flash on
+  // timeout), so we gate with a ref to ensure exactly-once per sessionId.
+  const generateFiredFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
+    if (generateFiredFor.current === sessionId) return;
+    generateFiredFor.current = sessionId;
+
     let cancelled = false;
     (async () => {
       try {
@@ -62,6 +69,8 @@ export const OnboardingLayer3Screen = () => {
         const msg =
           err instanceof ApiError ? err.message : 'Could not load your Twin statements.';
         Alert.alert('Load failed', msg);
+        // Reset the gate so a manual retry can fire again.
+        generateFiredFor.current = null;
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -69,7 +78,10 @@ export const OnboardingLayer3Screen = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, navigation]);
+    // Intentionally NOT including `navigation` — it's not stable across
+    // renders and would cause the expensive layer3 call to fire repeatedly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const setAgree = (i: number, agree: boolean) =>
     setDrafts((ds) => ds.map((d, idx) => (idx === i ? { ...d, agree } : d)));

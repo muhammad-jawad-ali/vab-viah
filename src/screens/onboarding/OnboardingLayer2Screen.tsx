@@ -9,7 +9,7 @@
 // Live radar mirrors the backend's running personalityVector so the user can
 // watch their Twin take shape.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeScreen } from '../../components/SafeScreen';
 import { api } from '../../api/client';
@@ -89,6 +89,15 @@ export const OnboardingLayer2Screen = () => {
   const currentCard = useMemo(() => nextUnansweredCard(answeredIds), [answeredIds]);
   const cardsAnsweredCount = answeredIds.length;
 
+  // Side-effect navigation must run AFTER render, not during. Calling
+  // navigation.reset() inside a render branch triggers React 19's
+  // "Cannot update a component while rendering" guard.
+  useEffect(() => {
+    if (sessionId && !currentCard) {
+      navigation.reset({ index: 0, routes: [{ name: 'OnboardingLayer3' }] });
+    }
+  }, [sessionId, currentCard, navigation]);
+
   // If somehow we landed here with no sessionId, kick back to Layer 1.
   if (!sessionId) {
     return (
@@ -113,8 +122,8 @@ export const OnboardingLayer2Screen = () => {
   }
 
   if (!currentCard) {
-    // All 12 answered — advance.
-    navigation.reset({ index: 0, routes: [{ name: 'OnboardingLayer3' }] });
+    // All 12 answered — the useEffect above will navigate. Render a spinner
+    // until the navigator unmounts this screen.
     return (
       <SafeScreen className="bg-primary-dark">
         <View className="flex-1 items-center justify-center">
