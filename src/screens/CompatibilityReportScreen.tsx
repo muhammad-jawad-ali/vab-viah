@@ -30,9 +30,14 @@ import {
   type StoredReport,
   type Dimension,
 } from '../api/types';
+import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../store/useAppStore';
 import { Skeleton } from '../components/Skeleton';
 import { CompatibilityRadar } from '../components/CompatibilityRadar';
+
+const lightHaptic = () => {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
@@ -231,6 +236,7 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
         {rec !== 'not_recommended' ? (
           <TouchableOpacity
             onPress={() => {
+              lightHaptic();
               navigation.popToTop();
               navigation
                 .getParent()
@@ -239,6 +245,8 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
                   params: { matchId: candidateTwinId, matchName: displayName },
                 });
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`Initiate halal reveal with ${displayName}`}
             className="bg-primary py-5 rounded-2xl items-center mb-3 shadow-lg shadow-primary/20"
           >
             <Text className="text-surface font-bold text-xs tracking-widest uppercase">
@@ -255,6 +263,8 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
                 params: { matchId: candidateTwinId, matchName: displayName },
               })
           }
+          accessibilityRole="button"
+          accessibilityLabel={`Report an issue regarding ${displayName}`}
           className="border border-rose-200 bg-rose-50/50 py-4 rounded-2xl items-center"
         >
           <Text className="text-rose-700 font-bold text-xs tracking-widest uppercase">

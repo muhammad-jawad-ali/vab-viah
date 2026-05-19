@@ -43,9 +43,14 @@ import {
   type WaliBriefBundle,
   type WaliRelation,
 } from '../api/types';
+import * as Haptics from 'expo-haptics';
 import { useTraceStream } from '../hooks/useTraceStream';
 import { useAppStore, type BookingWaliInfo } from '../store/useAppStore';
 import { Skeleton } from '../components/Skeleton';
+
+const lightHaptic = () => {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<MeetingStackParamList, 'Booking'>;
@@ -297,12 +302,21 @@ const BookMode = ({
                 city={outcome.proposal.city}
                 area={outcome.proposal.area}
                 selectedIndex={selectedIndex}
-                onSelect={setSelectedIndex}
+                onSelect={(i) => {
+                  lightHaptic();
+                  setSelectedIndex(i);
+                }}
               />
               <WaliBriefPanel briefs={outcome.waliBrief.briefs} />
               <TouchableOpacity
                 disabled={selectedIndex === null || confirming}
-                onPress={onConfirmSlot}
+                onPress={() => {
+                  lightHaptic();
+                  void onConfirmSlot();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Confirm booking with selected slot"
+                accessibilityState={{ disabled: selectedIndex === null || confirming }}
                 className={`py-5 rounded-2xl items-center shadow-md mt-4 ${
                   selectedIndex !== null && !confirming
                     ? 'bg-primary shadow-primary/10'
@@ -408,6 +422,9 @@ const WaliForm = ({
             <TouchableOpacity
               key={r}
               onPress={() => setUserWaliRelation(r)}
+              accessibilityRole="radio"
+              accessibilityLabel={`Wali relation: ${r}`}
+              accessibilityState={{ selected: active }}
               className={`px-3.5 py-1.5 rounded-full border ${
                 active ? 'bg-primary border-primary' : 'bg-surface border-slate-200'
               }`}
@@ -457,6 +474,8 @@ const WaliForm = ({
 
     <TouchableOpacity
       onPress={onSubmit}
+      accessibilityRole="button"
+      accessibilityLabel="Submit wali information and build booking"
       className="bg-primary py-5 rounded-2xl items-center shadow-md shadow-primary/10 mt-4"
     >
       <Text className="text-surface font-bold text-xs tracking-widest uppercase">
@@ -614,6 +633,9 @@ const SlotPicker = ({
         <TouchableOpacity
           key={p.index}
           onPress={() => onSelect(p.index)}
+          accessibilityRole="radio"
+          accessibilityLabel={`Slot ${p.index + 1}: ${p.slot.slotHuman} at ${p.venue.name}`}
+          accessibilityState={{ selected: isSelected }}
           className={`rounded-2xl p-5 mb-3 border ${
             isSelected
               ? 'bg-primary/5 border-primary shadow-sm'
@@ -923,6 +945,8 @@ const Receipt = ({
 
     <TouchableOpacity
       onPress={onDone}
+      accessibilityRole="button"
+      accessibilityLabel="View meetings log"
       className="bg-primary py-5 rounded-2xl items-center shadow-md shadow-primary/10"
     >
       <Text className="text-surface font-bold text-xs tracking-widest uppercase">
@@ -1031,6 +1055,8 @@ const MeetingsLog = ({
                     onPress={() =>
                       navigation.navigate('FeedbackSurvey', { meetingId: meeting.id })
                     }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rate the meeting with ${meeting.matchName} after it happens`}
                     className="flex-1 bg-emerald-800/10 border border-emerald-800/20 py-2.5 rounded-xl items-center"
                   >
                     <Text className="text-emerald-800 text-[10px] font-bold uppercase tracking-widest">
@@ -1044,6 +1070,8 @@ const MeetingsLog = ({
                         matchName: meeting.matchName,
                       })
                     }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Report an issue with ${meeting.matchName}`}
                     className="flex-1 border border-rose-200 bg-rose-50/50 py-2.5 rounded-xl items-center"
                   >
                     <Text className="text-rose-700 text-[10px] font-bold uppercase tracking-widest">
@@ -1085,6 +1113,8 @@ const MeetingsLog = ({
                 </View>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('FeedbackSurvey', { meetingId: meeting.id })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rate meeting with ${meeting.matchName} now`}
                   className="bg-amber-600 py-3 rounded-2xl items-center mt-2 shadow-sm shadow-amber-900/10"
                 >
                   <Text className="text-white text-xs font-extrabold uppercase tracking-widest">

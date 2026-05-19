@@ -148,6 +148,9 @@ export const DisputeFormScreen = ({ navigation, route }: Props) => {
                   <TouchableOpacity
                     key={cat.value}
                     onPress={() => setCategory(cat.value)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Category: ${cat.label}`}
+                    accessibilityState={{ selected: category === cat.value }}
                     className={`px-4 py-2 rounded-full border ${
                       category === cat.value
                         ? 'bg-rose-50 border-rose-600'
@@ -191,6 +194,9 @@ export const DisputeFormScreen = ({ navigation, route }: Props) => {
               <TouchableOpacity
                 disabled={!canSubmit}
                 onPress={handleSubmit}
+                accessibilityRole="button"
+                accessibilityLabel="Submit dispute"
+                accessibilityState={{ disabled: !canSubmit }}
                 className={`py-5 rounded-2xl items-center shadow-md ${
                   canSubmit ? 'bg-rose-600 shadow-rose-600/10' : 'bg-slate-200'
                 }`}
@@ -313,6 +319,8 @@ const ResolutionView = ({
 
       <TouchableOpacity
         onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Back to meetings log"
         className="bg-primary py-5 rounded-2xl items-center shadow-md shadow-primary/10"
       >
         <Text className="text-surface font-bold text-xs tracking-widest uppercase">Back to Meetings</Text>

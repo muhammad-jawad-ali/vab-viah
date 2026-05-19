@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { MeetingStackParamList } from '../navigation/types';
+import * as Haptics from 'expo-haptics';
 import { api } from '../api/client';
 import {
   ApiError,
@@ -29,6 +30,10 @@ import {
   type FeedbackResponse,
 } from '../api/types';
 import { useAppStore } from '../store/useAppStore';
+
+const lightHaptic = () => {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<MeetingStackParamList, 'FeedbackSurvey'>;
@@ -51,7 +56,17 @@ const RatingRow = ({
     {caption ? <Text className="text-slate-500 text-[11px] mb-2">{caption}</Text> : null}
     <View className="flex-row gap-3 mt-2">
       {[1, 2, 3, 4, 5].map((star) => (
-        <TouchableOpacity key={star} onPress={() => onChange(star)} hitSlop={6}>
+        <TouchableOpacity
+          key={star}
+          onPress={() => {
+            lightHaptic();
+            onChange(star);
+          }}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`Rate ${label} ${star} of 5`}
+          accessibilityState={{ selected: star <= value }}
+        >
           <Text style={{ fontSize: 28, opacity: star <= value ? 1 : 0.22 }}>⭐</Text>
         </TouchableOpacity>
       ))}
@@ -216,7 +231,13 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
 
               <TouchableOpacity
                 disabled={!canSubmit}
-                onPress={handleSubmit}
+                onPress={() => {
+                  lightHaptic();
+                  void handleSubmit();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Submit ratings and forge a new Twin"
+                accessibilityState={{ disabled: !canSubmit }}
                 className={`py-5 rounded-2xl items-center shadow-md ${
                   canSubmit ? 'bg-primary shadow-primary/10' : 'bg-slate-200'
                 }`}
@@ -237,6 +258,8 @@ export const FeedbackSurveyScreen = ({ navigation, route }: Props) => {
               <TouchableOpacity
                 onPress={handleRateLater}
                 disabled={submitting}
+                accessibilityRole="button"
+                accessibilityLabel="Skip and rate later"
                 className="mt-4 py-4 rounded-2xl items-center border border-slate-300 bg-transparent"
               >
                 <Text className="text-slate-600 font-bold text-xs tracking-widest uppercase">

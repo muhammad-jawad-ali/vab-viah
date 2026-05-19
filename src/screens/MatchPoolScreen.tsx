@@ -36,9 +36,14 @@ import {
   type FrontendMatch,
   type StoredReport,
 } from '../api/types';
+import * as Haptics from 'expo-haptics';
 import { useTraceStream, PHASE_LABEL } from '../hooks/useTraceStream';
 import { useAppStore } from '../store/useAppStore';
 import { Skeleton } from '../components/Skeleton';
+
+const lightHaptic = () => {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'MatchPool'>;
@@ -135,6 +140,7 @@ const DeckCard = ({
       }),
       onPanResponderRelease: (_, g) => {
         if (g.dx > SWIPE_THRESHOLD) {
+          lightHaptic();
           Animated.timing(pan, {
             toValue: { x: width + 80, y: g.dy },
             duration: 220,
@@ -144,6 +150,7 @@ const DeckCard = ({
             onSwipeRightRef.current();
           });
         } else if (g.dx < -SWIPE_THRESHOLD) {
+          lightHaptic();
           Animated.timing(pan, {
             toValue: { x: -width - 80, y: g.dy },
             duration: 220,
@@ -504,13 +511,23 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
           {matches[0] ? (
             <View className="flex-row justify-center items-center gap-6 mt-6">
               <TouchableOpacity
-                onPress={() => handlePass(matches[0]!)}
+                onPress={() => {
+                  lightHaptic();
+                  handlePass(matches[0]!);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Pass on ${matches[0]!.displayName}`}
                 className="bg-surface border border-rose-200 w-16 h-16 rounded-full items-center justify-center shadow-sm"
               >
                 <Text className="text-rose-600 text-2xl">✕</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handleConsider(matches[0]!)}
+                onPress={() => {
+                  lightHaptic();
+                  handleConsider(matches[0]!);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Consider ${matches[0]!.displayName} — view live Twin debate`}
                 className="bg-primary w-20 h-20 rounded-full items-center justify-center shadow-lg shadow-primary/30"
               >
                 <Text className="text-surface text-2xl font-bold">→</Text>
