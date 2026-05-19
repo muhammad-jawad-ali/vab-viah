@@ -307,46 +307,170 @@ export type TraceEventType = TraceEvent['type'];
 
 // ---------------------------------------------------------------------------
 // Booking — POST /book/initiate, /book/confirm.
-// Confirm shapes against backend/src/routes/booking.routes.ts in Session 4.
+//
+// Sources of truth:
+//   - backend/src/routes/booking.routes.ts (request/response envelope)
+//   - backend/src/workplans/book-meeting.workplan.ts (BookMeeting*Outcome
+//     types — also the shape of `workplan.finished.outcome` emitted via SSE)
+//   - backend/src/agents/booking.agent.ts (SlotProposal, FinalizeMeetingOutput)
+//   - backend/src/agents/wali.agent.ts (WaliBrief* — bundle returned via SSE)
+//   - backend/src/tools/calendar.mock.ts (ProposedSlot fields)
+//   - backend/src/tools/maps.ts (Venue fields)
 // ---------------------------------------------------------------------------
-export type WaliBrief = {
-  language: 'en' | 'ur' | 'ro_ur';
-  body: string;
-  audio_dataUri?: string;
-  sms_preview?: string;
+export type WaliRelation = 'father' | 'uncle' | 'brother' | 'guardian';
+
+// Per backend POST /book/initiate Zod schema. All wali fields are required —
+// the workplan generates the wali brief synchronously.
+export type BookInitiateRequest = {
+  candidateTwinId: string;
+  userWaliName: string;
+  userWaliRelation: WaliRelation;
+  userWaliPhone: string;        // E.164: /^\+\d{7,15}$/
+  candidateWaliName: string;
+  candidateWaliPhone: string;   // E.164
+  area?: string;
 };
 
-export type ProposedSlot = {
-  slotId: string;
-  slotIso: string;
-  confidence: number;
-  displayDay: string;
-  displayTime: string;
-};
-
-export type ProposedVenue = {
-  venueId: string;
-  name: string;
-  address: string;
-  city: string;
-  fallback?: boolean;
-};
-
-export type BookInitiateRequest = { candidateTwinId: string };
+// /book/initiate returns ONLY these three fields synchronously. The slots,
+// venues, and wali brief land via the SSE stream — read them off
+// `workplan.finished.outcome` (BookMeetingInitiateOutcome below).
 export type BookInitiateResponse = {
   flowId: string;
   meetingId: string;
-  briefs: WaliBrief[];
-  slots: ProposedSlot[];
-  venues: ProposedVenue[];
+  streamUrl: string;
 };
 
-export type BookConfirmRequest = {
+// One calendar-mock slot.
+export type ProposedSlot = {
+  slotIso: string;
+  slotHuman: string;
+  dayOfWeek: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+  bothWalisFree: true;
+  userWaliConfidence: number;
+  candidateWaliConfidence: number;
+  rank: number;
+};
+
+// One maps-derived venue.
+export type Venue = {
+  name: string;
+  address: string;
+  area: string;
+  city: string;
+  rating: number | null;
+  priceLevel: 1 | 2 | 3 | null;
+  category: 'cafe' | 'restaurant' | 'family_restaurant' | 'fallback';
+  source: 'maps_places' | 'fallback';
+  placeId: string | null;
+  mapsUrl: string;
+};
+
+export type SlotProposal = {
+  index: number;
+  slot: ProposedSlot;
+  venue: Venue;
+  venueFromFallback: boolean;
+  summary: string;
+};
+
+export type WaliBriefLanguage = 'en' | 'ur' | 'ro_ur';
+
+export type WaliBriefDocument = {
+  salutation: string;
+  headline: string;
+  candidate_summary: string;
+  alignment_points: string[];
+  discussion_points: string[];
+  recommended_next_step: string;
+  compatibility_label: string;
+  _pct?: string;
+};
+
+export type WaliBriefAudio = {
+  audioDataUri: string | null; // data:audio/mp3;base64,... or null when TTS skipped.
+  audioBytes: number;
+  voiceUsed: string | null;
+  textOnly: boolean;
+  skipReason: string | null;
+};
+
+export type SmsRenderResult = {
+  body: string;
+  segments: number;
+  language: WaliBriefLanguage;
+  template: string;
+  sentAt: string;
+  delivered: true;
+  mocked: true;
+};
+
+export type WaliBriefBundle = {
+  language: WaliBriefLanguage;
+  document: WaliBriefDocument;
+  spokenText: string;
+  audio: WaliBriefAudio;
+  walisSms: SmsRenderResult;
+  briefFromFallback: boolean;
+};
+
+export type WaliBriefOutput = {
+  briefs: WaliBriefBundle[];   // length 2: EN + native.
+  generatedAt: string;
+};
+
+export type ProposeSlotsOutput = {
+  proposals: SlotProposal[];
+  city: string;
+  area: string;
+  generatedAt: string;
+};
+
+// Shape of TraceEvent.workplan.finished.outcome emitted by the book_meeting
+// workplan after persist_proposal. The route returns flowId+meetingId
+// synchronously — everything else (slots, venues, wali brief) is here.
+export type BookMeetingInitiateOutcome = {
+  flowId: string;
+  meetingId: string;
+  candidateName: string;
+  proposal: ProposeSlotsOutput;
+  waliBrief: WaliBriefOutput;
+  candidateWaliSms: SmsRenderResult[];
+  durationMs: number;
+};
+
+export type Reminder = {
+  fireAtIso: string;
+  hoursBefore: number;
+  channel: 'sms' | 'inapp';
+  audience: 'user' | 'wali_user' | 'wali_candidate' | 'candidate';
+};
+
+export type FinalizeMeetingOutput = {
   meetingId: string;
   slotIso: string;
-  venueId: string;
+  slotHuman: string;
+  venue: Venue;
+  meetingCardUrl: string;
+  reminders: Reminder[];
 };
 
+// /book/confirm body — slotIndex into venue.proposed (0..9 per backend Zod).
+export type BookConfirmRequest = {
+  meetingId: string;
+  slotIndex: number;
+};
+
+// /book/confirm response (BookMeetingConfirmOutcome).
+export type BookConfirmResponse = {
+  meetingId: string;
+  flowId: string;
+  finalized: FinalizeMeetingOutput;
+  confirmationSms: SmsRenderResult[];
+};
+
+// Legacy frontend Meeting shape — kept only because some adapter consumers
+// reference it. New code reads BookMeetingInitiateOutcome / BookConfirmResponse
+// directly.
 export type Meeting = {
   id: string;
   user_id: string;
@@ -359,10 +483,10 @@ export type Meeting = {
   reminders: unknown;
 };
 
-export type BookConfirmResponse = { meeting: Meeting };
-
 // ---------------------------------------------------------------------------
 // Dispute — POST /dispute/file.
+// Source: backend/src/routes/dispute.routes.ts +
+//         backend/src/agents/dispute.agent.ts (DisputeResolutionSchema).
 // ---------------------------------------------------------------------------
 export type DisputeType =
   | 'no_show'
@@ -378,41 +502,67 @@ export type DisputeAction =
   | 'flag_for_human_review'
   | 'mutual_close';
 
+export type DisputeReputationImpact = {
+  party: 'filer' | 'counterparty';
+  delta: number;       // ≤0 always
+  reason: string;
+};
+
+export type DisputeBlocklistChange = {
+  party: 'filer' | 'counterparty';
+  blockedTwinId: string;
+};
+
+export type DisputeOutreach = {
+  toRole: 'user' | 'wali_user' | 'counterparty';
+  messageKey: 'filed' | 'resolved';
+};
+
 export type DisputeResolution = {
   type: DisputeType;
-  severity: number;
+  severity: 1 | 2 | 3 | 4 | 5;
   action: DisputeAction;
-  rationale: string;
+  reputation_impact: DisputeReputationImpact[];
+  blocklist_changes: DisputeBlocklistChange[];
   escalated: boolean;
-  reputation_impact: { partyId: string; delta: number }[];
+  rationale: string;
+  outreach: DisputeOutreach[];
 };
 
 export type DisputeFileRequest = {
   meetingId: string;
+  filedBy: 'user' | 'wali';
   type: DisputeType;
-  narrative: string;
+  narrative: string;        // 10..2000 chars
+  counterPartyNarrative?: string;
 };
 
-export type DisputeFileResponse = { resolution: DisputeResolution };
+export type DisputeFileResponse = {
+  disputeId: string;
+  flowId: string;
+  resolution: DisputeResolution;
+};
 
 // ---------------------------------------------------------------------------
 // Feedback — POST /feedback/post-meeting.
+// Source: backend/src/routes/feedback.routes.ts.
+// Body is FLAT (ratings sibling to meetingId), not nested under `ratings`.
 // ---------------------------------------------------------------------------
-export type FeedbackRatings = {
-  truthfulness: number;
-  chemistry: number;
-  family_alignment: number;
-  would_meet_again: number;
-};
-
 export type FeedbackRequest = {
   meetingId: string;
-  ratings: FeedbackRatings;
+  truthfulness: number;       // 1..5
+  chemistry: number;          // 1..5
+  family_alignment: number;   // 1..5
+  would_meet_again: number;   // 1..5
   narrative?: string;
 };
 
 export type FeedbackResponse = {
+  meetingId: string;
+  previousTwinId: string;
   newTwinId: string;
+  version: number;
+  weightsChanged: Partial<Record<Dimension, { from: number; to: number }>>;
   systemPromptRefreshed: boolean;
 };
 
