@@ -114,10 +114,21 @@ const DeckCard = ({
     extrapolate: 'clamp',
   });
 
+  // Refs mirror props so the long-lived PanResponder callbacks read live
+  // values instead of stale ones from the responder's creation closure.
+  // Without this, only the first card is interactive — once it swipes off
+  // and card #2 becomes the top, its responder still sees isTop=false.
+  const isTopRef = useRef(isTop);
+  isTopRef.current = isTop;
+  const onSwipeRightRef = useRef(onSwipeRight);
+  onSwipeRightRef.current = onSwipeRight;
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  onSwipeLeftRef.current = onSwipeLeft;
+
   const responder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
-        isTop && (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6),
+        isTopRef.current && (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6),
       onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
         useNativeDriver: false,
       }),
@@ -129,7 +140,7 @@ const DeckCard = ({
             useNativeDriver: false,
           }).start(() => {
             pan.setValue({ x: 0, y: 0 });
-            onSwipeRight();
+            onSwipeRightRef.current();
           });
         } else if (g.dx < -SWIPE_THRESHOLD) {
           Animated.timing(pan, {
@@ -138,7 +149,7 @@ const DeckCard = ({
             useNativeDriver: false,
           }).start(() => {
             pan.setValue({ x: 0, y: 0 });
-            onSwipeLeft();
+            onSwipeLeftRef.current();
           });
         } else {
           Animated.spring(pan, {
@@ -293,20 +304,21 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
   const requestFired = useRef(false);
 
   const trace = useTraceStream(flowId);
+  const setReportsForFlow = useAppStore((s) => s.setReportsForFlow);
 
-  // Step 1: kick the workplan.
-  useEffect(() => {
+  // Kick /match/request and update flowId. Called from the initial mount
+  // effect AND from "Run New Match" retry — having a stand-alone function
+  // (instead of relying on the mount effect's empty-deps useEffect) is what
+  // lets retry actually re-fire the workplan.
+  const kickoffMatchRequest = React.useCallback(() => {
     if (requestFired.current) return;
     requestFired.current = true;
 
-    let cancelled = false;
     (async () => {
       try {
         const res = await api.match.request();
-        if (cancelled) return;
         setFlowId(res.flowId);
       } catch (err) {
-        if (cancelled) return;
         const msg =
           err instanceof ApiError
             ? `${err.code}: ${err.message}`
@@ -318,11 +330,12 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
         requestFired.current = false;
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  // Step 1: kick the workplan on mount.
+  useEffect(() => {
+    kickoffMatchRequest();
+  }, [kickoffMatchRequest]);
 
   // Step 2: when SSE finishes, fetch results.
   useEffect(() => {
@@ -335,7 +348,11 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
       try {
         const res = await api.match.results(flowId);
         if (cancelled) return;
-        setReports(res.allDebated ?? []);
+        const all = res.allDebated ?? [];
+        setReports(all);
+        // Cache by flowId so TwinDebate can render a replay-unavailable view
+        // for subsequent considers (the workplan bus is gone after finish).
+        setReportsForFlow(flowId, all);
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof ApiError ? err.message : 'Could not load results.';
@@ -345,7 +362,7 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [flowId, trace.status, reports]);
+  }, [flowId, trace.status, reports, setReportsForFlow]);
 
   // Reset viewed count when the screen regains focus (paywall flow).
   useFocusEffect(
@@ -391,6 +408,9 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
     setResultsErr(null);
     setDismissedIds(new Set());
     requestFired.current = false;
+    // Re-fire the workplan directly — the mount useEffect won't run again,
+    // and useTraceStream resets itself on the flowId=null transition above.
+    kickoffMatchRequest();
   };
 
   const phaseLabel = PHASE_LABEL[trace.phase];

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TwinSpec } from '../api/types';
+import type { StoredReport, TwinSpec } from '../api/types';
 import type {
   OnboardingPersistedLayer,
   OnboardingPersistedState,
@@ -20,6 +20,15 @@ interface DebateMessage {
   speaker: 'userTwin' | 'candidateTwin' | 'moderator';
   text: string;
 }
+
+export type BookingWaliInfo = {
+  userWaliName: string;
+  userWaliRelation: 'father' | 'uncle' | 'brother' | 'guardian';
+  userWaliPhone: string;
+  candidateWaliName: string;
+  candidateWaliPhone: string;
+  area?: string;
+};
 
 // Legacy local-only twin summary shape preserved for screens that still read it.
 // The real backend Twin spec lives on `twinSpec`.
@@ -60,6 +69,18 @@ interface AppState {
   activeMatchId: string | null;
   debateLog: DebateMessage[];
 
+  // Reports cache keyed by flowId. find_matches emits one trace per flowId
+  // covering all 5 debates; after workplan.finished the SSE bus is closed and
+  // re-subscribing yields {type:'error', message:'Unknown flowId ...'}. When
+  // the user considers a non-first card we read from this cache to render a
+  // replay-unavailable variant of TwinDebate instead of hanging on Connecting.
+  reportsByFlow: Record<string, StoredReport[]>;
+
+  // Persisted wali contact info captured on the first booking; reused
+  // (pre-filled) on subsequent /book/initiate calls so the user doesn't
+  // re-type it. Backend requires user + candidate wali on every initiate.
+  bookingWaliInfo: BookingWaliInfo | null;
+
   // Meeting
   activeMeetingId: string | null;
   activeMeetingUrl: string | null;
@@ -99,6 +120,8 @@ interface AppState {
   completeMeeting: (meetingId: string) => void;
   setMeetingStatus: (meetingId: string, status: 'scheduled' | 'pending_feedback' | 'done') => void;
   setPremium: (val: boolean) => void;
+  setReportsForFlow: (flowId: string, reports: StoredReport[]) => void;
+  setBookingWaliInfo: (info: BookingWaliInfo) => void;
   logout: () => void;
 }
 
@@ -134,6 +157,8 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   isPremium: false,
   activeMatchId: null,
+  reportsByFlow: {},
+  bookingWaliInfo: null,
 
   // Debate log
   debateLog: [
@@ -231,6 +256,13 @@ export const useAppStore = create<AppState>((set) => ({
 
   setPremium: (isPremium) => set({ isPremium }),
 
+  setReportsForFlow: (flowId, reports) =>
+    set((state) => ({
+      reportsByFlow: { ...state.reportsByFlow, [flowId]: reports },
+    })),
+
+  setBookingWaliInfo: (bookingWaliInfo) => set({ bookingWaliInfo }),
+
   logout: () =>
     set({
       token: null,
@@ -247,6 +279,8 @@ export const useAppStore = create<AppState>((set) => ({
       onboardingLastLayer: 0,
       onboardingAnsweredCardIds: [],
       activeMatchId: null,
+      reportsByFlow: {},
+      bookingWaliInfo: null,
       activeMeetingId: null,
       activeMeetingUrl: null,
       meetingsList: [

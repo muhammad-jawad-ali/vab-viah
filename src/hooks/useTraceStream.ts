@@ -79,7 +79,15 @@ export function useTraceStream(flowId: string | null | undefined): TraceStreamSt
   const counterRef = useRef(0);
 
   useEffect(() => {
-    if (!flowId) return;
+    if (!flowId) {
+      // flowId cleared by caller (e.g. MatchPool retry). Reset so the next
+      // subscription doesn't inherit the old run's `finished` status.
+      if (subscribedFlow.current !== null) {
+        subscribedFlow.current = null;
+        setState(INITIAL);
+      }
+      return;
+    }
     // Guard against React 19 StrictMode double-fire.
     if (subscribedFlow.current === flowId) return;
     subscribedFlow.current = flowId;
