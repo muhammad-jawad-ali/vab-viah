@@ -30,14 +30,14 @@
 
 ## 1. Current status snapshot
 
-- **Project phase:** Session 4 COMPLETE — booking + dispute + feedback now wired end-to-end against the real backend. Match flow regressions from Session 3's device test all swept. BookingScreen collects user+candidate wali, POSTs /book/initiate, subscribes to /stream/:flowId, renders proposed (slot, venue) pairs + an expandable wali-brief panel (per-language tabs, lazy-loaded expo-av audio player, native Share for SMS preview), POSTs /book/confirm with the chosen slotIndex, and renders a receipt with the locked venue + reminder schedule + confirmation SMS. DisputeFormScreen wires /dispute/file and renders the typed DisputeResolution (severity 1..5 + action label + agent rationale + per-party reputation deltas + blocklist updates + escalated badge). FeedbackSurveyScreen wires /feedback/post-meeting with the four required ratings, displays the Twin v2 weights diff, and re-fetches /twin/me. WaliTab gone from MainTabs (non-negotiable #6 enforced). Session 5 next = premium UI polish + remaining time-boxed cleanup.
+- **Project phase:** **Session 5 COMPLETE — submission-ready.** All 6 active screens visually polished (real Playfair Display + Inter via expo-font, unified token palette with saffron accent, reusable Skeleton component placed across MatchPool / Booking initiate / CompatibilityReport loading paths, polished empty + error retry cards). Compatibility radar chart (octagonal SVG, 8 dimensions, score dots, legend) renders at the top of CompatibilityReportScreen. TwinDebate gets per-dim cell fade-in animations, recovery chips in a horizontal scroll row, and a verdict CTA that fades + slides in on workplan finish. expo-haptics light feedback fires on every primary CTA (swipe deck release, swipe buttons, slot select, Confirm Booking, feedback stars, Initiate Halal Reveal). accessibilityLabel on every primary button across the 6 active screens. Cleanup: mockData.ts deleted, _archive/ deleted (with tsconfig exclude removed), legacy `matches[]` + `debateLog[]` + `meet_past_1` seeds dropped from useAppStore. ngrok dev-dep reverted at session start. `npm run typecheck` clean on every commit. DEMO_SCRIPT.md authored — picks Ayesha Khan as target candidate, documents the 8 Layer-1 chat answers + 12 scenario card picks + Layer-3 confirms + Layer-4 skip + booking wali fields, plus a 19-step manual walkthrough. Static verification of Railway endpoints (health / OTP start / OTP verify / twin/me) passes. Submission tomorrow (2026-05-20).
 - **Frontend repo:** `frontend/vab-viah/` (git remote: `https://github.com/muhammad-jawad-ali/Lab-Viah-Frontend.git`). Pushed to branch `integration/session-1-foundation`.
 - **Backend status:** Backend touched in Session 4 for two demo-critical JSON-truncation fixes (twin_forge Layer-3 statements + moderator final synthesis). Bump tokens 2048→4096 / 1024→2048, plus a hand-rolled `repairTruncatedJson` utility that closes unterminated strings/brackets/colons before falling back to deterministic output. Backend repo: `ZakiNabeel/Lab-Viah` branch `backend/main`, pushed → Railway auto-deploy.
 - **Backend Railway URL:** `https://lab-viah-production.up.railway.app` — frontend `.env` points here.
 - **Backend dev URL:** `http://localhost:3000` (rarely needed now — Railway is the device-test target).
 - **Dev OTP bypass:** `+923001234567` / `0000` works on both dev and Railway.
 - **Days until 20 May submission:** 1 (today is 2026-05-19).
-- **Last updated:** 2026-05-19 by Session 4 (booking + dispute + feedback + wali decouple + JSON repair).
+- **Last updated:** 2026-05-19 by Session 5 (premium UI polish + cleanup + demo script).
 
 ---
 
@@ -147,7 +147,33 @@
   - Frontend (on `integration/session-1-foundation`): `fix(match): swipe deck stale closure + retry kickoff + report cache` · `fix(debate): handle SSE replay-unavailable after workplan finished` · `chore(types): align booking/dispute/feedback types with backend handlers` · `refactor(nav): drop WaliTab from MainTabs` · `feat(book): wire booking against /book/initiate + /book/confirm` · `feat(dispute): wire /dispute/file with live trace indicator` · `feat(feedback): wire /feedback/post-meeting + refresh /twin/me`.
   - Backend (on `backend/main`): `fix(agents): jsonrepair fallback + bumped Pro tokens for truncation` — pushed → Railway auto-deploy.
 
-**Session 5 (Premium UI polish): NOT STARTED.**
+**Session 5 (Premium UI polish + cleanup + demo script — 2026-05-19):**
+
+- [x] **Pre-flight.** Reverted the `@expo/ngrok` dev-dep diff via `git checkout -- package.json package-lock.json`. `git pull --ff-only` clean on both repos.
+- [x] **Phase A — Design tokens + typography.** `tailwind.config.js` locked: `primary` (deep teal #064e3b) + `saffron` (#e9a847) accent + `secondary` gold + `danger` rose + warm-cream background. Typography scale (`text-display`, `text-h1`, `text-h2`, `text-body`, `text-caption`). `font-serif` now points to `PlayfairDisplay_700Bold` (Georgia fallback); `font-sans` → `Inter_400Regular`. Installed `@expo-google-fonts/playfair-display`, `@expo-google-fonts/inter`, `expo-font` via `npx expo install` (auto-added the expo-font config plugin). `App.tsx` now gates the boot ActivityIndicator on `useFonts(...)` AND `bootReady`.
+- [x] **Phase B — Loading + empty + error polish.** New `src/components/Skeleton.tsx` (Animated.Value opacity loop, props for width/height/rounded). Placements: MatchPool LoadingState (3 stacked deck-shaped skeletons + live "Running Twin debates" phase counter), BookingScreen InitiatingState (live phase indicator on top + 3 slot-row skeletons + brief-panel skeleton), CompatibilityReport LoadingView (hero skeleton + 8-row dim breakdown skeleton). MatchPool EmptyState gets a saffron-tinted icon card + improved copy + accessibilityLabel on the Run-New-Match CTA. ErrorState (MatchPool) and ErrorView (CompatibilityReport) get a polished retry-card visual language (rose-tinted icon + error envelope + accessibilityLabel on the Retry CTA).
+- [x] **Phase C — Debate + report visual polish.** Installed `react-native-svg` via `npx expo install` (autolinks under Expo SDK 54 without dev-client rebuild). New `src/components/CompatibilityRadar.tsx` — octagonal SVG radar with 4 concentric rings, radial spokes, scored polygon (filled cyan with stroke), 8 vertex score dots colored by tier (strong / mid / friction), dimension labels at vertices, color-coded legend below. Wired into `CompatibilityReportScreen.tsx` above the per-dim breakdown rows. `TwinDebateScreen.tsx` DimensionCell now fades + slides up (Animated.parallel(opacity 0→1 + translateY 6→0, 320ms) when each `dimension.scored` event lands. Recovery list converted from bullet-list to horizontal-scroll chip row (`bg-amber-100` chips). Verdict CTA wrapped in `VerdictCta` component with Animated.parallel(opacity 0→1 + translateY 8→0, 320ms easing out cubic) on mount.
+- [x] **Phase D — Haptics + accessibility.** Installed `expo-haptics`. `Haptics.impactAsync(Light)` fires fire-and-forget on: MatchPool swipe-release (right & left), MatchPool CONSIDER / PASS button taps, BookingScreen slot select, BookingScreen Confirm Booking, FeedbackSurvey rating star tap (each star), CompatibilityReport "Initiate Halal Reveal", FeedbackSurvey submit. `accessibilityLabel` + `accessibilityRole` + `accessibilityState` audited on every primary button across the 6 active screens — radio roles on the wali-relation chips, dispute-category chips, slot picker; button role on every CTA with descriptive labels.
+- [x] **Phase E — Cleanup pass.** `src/api/mockData.ts` deleted (was only imported by the archived WaliDashboard, verified). `src/screens/_archive/` directory deleted (all 4 files: BasicProfileSetup, ProfileSetupScreen, TwinOnboardingScreen, WaliDashboardScreen). `tsconfig.json` `_archive` exclude removed since folder is gone. `useAppStore.ts` legacy mock seeds dropped: `matches: [...]` array, `debateLog: [...]` array, `meet_past_1` meeting seed (both in initial state and inside `logout()`). The two unused `Match` / `DebateMessage` interfaces deleted. `npm run typecheck` clean.
+- [x] **Phase F — Demo script.** `frontend/vab-viah/DEMO_SCRIPT.md` authored: F1 picks `Ayesha Khan` (UUID `11111111-1111-4111-8111-111111111111`) as target candidate — she's a 26y/o practicing female doctor in Karachi with joint family + asap kids + direct conflict + Karachi-rooted, dealbreakers "must be practicing / no smoking / no prior public relationship". The crafted user TwinSpec (Ahmad Siddiqui, 28, male, Karachi software engineer) mirrors her structured fields so the debate produces a high `overall_score`. F2 documents the 8-turn Layer-1 chat verbatim, the 12 card → option picks with a per-card delta-rationale table, Layer-3 "confirm all 3", Layer-4 skip. F3 documents the booking wali fields. F4 is a 19-step manual walkthrough covering signup → onboarding → match → debate → report → book → feedback → dispute, plus a pre-demo Supabase-reset note (the dev user's existing Twin v2 will short-circuit onboarding otherwise) and a static-verification appendix (Railway /health, /auth/otp/start, /auth/otp/verify, /twin/me all confirmed live during this session).
+- [x] **Session 5 commits** pushed to `origin/integration/session-1-foundation`:
+  - `chore(tokens): unify color palette + typography scale`
+  - `feat(fonts): load Playfair Display + Inter via expo-font`
+  - `feat(ui): reusable Skeleton component`
+  - `feat(match): skeleton loading + empty + error state polish`
+  - `feat(book,report): skeleton initiating + report loading + polished error`
+  - `feat(report): compatibility radar chart`
+  - `feat(debate): per-dim fade-in + recovery chips + verdict CTA animation`
+  - `feat(a11y): haptics + accessibilityLabels on primary CTAs`
+  - `chore(cleanup): delete mockData + _archive + drop legacy store seeds`
+  - `docs: demo script + 19-step manual walkthrough` *(pending — committed in the final SESSION_CONTEXT update)*
+
+### Pending for the user (post-session)
+
+- Run the F4 19-step walkthrough on a real device against Railway. Annotate
+  any deviations under "Live device walkthrough" in DEMO_SCRIPT.md.
+- Decide on the onboarding-in-demo approach (SQL reset vs skip live).
+- Merge `integration/session-1-foundation` → `main` decision deferred to user.
 
 ### Blockers
 
@@ -251,7 +277,7 @@ npx tsc --noEmit           # typecheck (add to package.json scripts in Session 1
 | 2 | Onboarding restructure (4-layer flow) | 4 hrs | ✅ DONE |
 | 3 | Match flow + SSE Twin debate | 5 hrs | ✅ DONE |
 | 4 | Booking + Dispute + Feedback + Wali decouple | 4 hrs | ✅ DONE |
-| 5 | Premium UI polish (time-boxed) | 3 hrs | NOT STARTED |
+| 5 | Premium UI polish (time-boxed) | 3 hrs | ✅ DONE |
 
 Each session is independently scoped — a lighter model can pick up Session N by reading MASTERPLAN.md §7 (the "Session N" block) plus this file's §6 handoff.
 
