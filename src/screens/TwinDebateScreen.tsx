@@ -220,15 +220,29 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
             ))}
             {trace.recoveries.length > 0 ? (
               <View className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 mt-2">
-                <Text className="text-amber-800 text-[10px] font-bold uppercase tracking-widest mb-1">
+                <Text className="text-amber-800 text-[10px] font-bold uppercase tracking-widest mb-2">
                   ⚠ {trace.recoveries.length} recovery
                   {trace.recoveries.length === 1 ? '' : 'ies'}
                 </Text>
-                {trace.recoveries.slice(-2).map((r) => (
-                  <Text key={r.id} className="text-amber-800/80 text-[11px] leading-relaxed">
-                    {r.action}
-                  </Text>
-                ))}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 6 }}
+                >
+                  {trace.recoveries.map((r) => (
+                    <View
+                      key={r.id}
+                      className="bg-amber-100 border border-amber-300 rounded-full px-3 py-1.5"
+                    >
+                      <Text
+                        className="text-amber-900 text-[11px] font-bold"
+                        numberOfLines={1}
+                      >
+                        {r.action}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             ) : null}
           </>
@@ -238,36 +252,86 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
         {replayUnavailable ? null : <ToolCallSection toolCalls={trace.toolCalls} />}
       </ScrollView>
 
-      {/* Verdict CTA */}
+      {/* Verdict CTA — fade + slide in on arrival */}
       {showVerdictCta ? (
-        <View
-          className="px-5 pt-3 border-t border-slate-200/80 bg-background"
-          style={{ paddingBottom: insets.bottom + 16 }}
-        >
-          <View className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
-            <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest text-center">
-              {replayUnavailable
-                ? '✓ Verdict reached (replay unavailable)'
-                : `✓ Verdict reached — ${trace.events.length} trace events`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('CompatibilityReport', {
-                flowId,
-                candidateTwinId,
-                displayName,
-              })
-            }
-            className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/20"
-          >
-            <Text className="text-surface font-bold text-xs tracking-widest uppercase">
-              View Compatibility Report →
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <VerdictCta
+          insets={insets}
+          replayUnavailable={replayUnavailable}
+          eventCount={trace.events.length}
+          onPress={() =>
+            navigation.navigate('CompatibilityReport', {
+              flowId,
+              candidateTwinId,
+              displayName,
+            })
+          }
+        />
       ) : null}
     </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// VerdictCta — fade + translateY reveal when the workplan finishes.
+// ---------------------------------------------------------------------------
+
+const VerdictCta = ({
+  insets,
+  replayUnavailable,
+  eventCount,
+  onPress,
+}: {
+  insets: { bottom: number };
+  replayUnavailable: boolean;
+  eventCount: number;
+  onPress: () => void;
+}) => {
+  const fade = useRef(new Animated.Value(0)).current;
+  const translate = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translate, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fade,
+        transform: [{ translateY: translate }],
+        paddingBottom: insets.bottom + 16,
+      }}
+      className="px-5 pt-3 border-t border-slate-200/80 bg-background"
+    >
+      <View className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
+        <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest text-center">
+          {replayUnavailable
+            ? '✓ Verdict reached (replay unavailable)'
+            : `✓ Verdict reached — ${eventCount} trace events`}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel="View compatibility report"
+        className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/20"
+      >
+        <Text className="text-surface font-bold text-xs tracking-widest uppercase">
+          View Compatibility Report →
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -350,17 +414,27 @@ const DimensionCell = ({
   // Backend dimension.scored emits score in [-1, 1]. Map to a 0-100% fill for
   // the bar but keep the sign for tone.
   const width = useRef(new Animated.Value(0)).current;
+  // Fade + translateY animation when the score first lands — staggers as
+  // dimensions stream in for a polished reveal.
+  const reveal = useRef(new Animated.Value(0)).current;
   const targetPct = score === undefined ? 0 : Math.round(Math.abs(score) * 100);
   const positive = (score ?? 0) >= 0;
 
   useEffect(() => {
     if (score === undefined) return;
-    Animated.timing(width, {
-      toValue: targetPct,
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+    Animated.parallel([
+      Animated.timing(reveal, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }),
+      Animated.timing(width, {
+        toValue: targetPct,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
   }, [score, targetPct]);
 
   const fillColor =
@@ -371,7 +445,23 @@ const DimensionCell = ({
         : '#f97316';
   const labelColor = score === undefined ? '#94a3b8' : '#0f172a';
 
+  const cellOpacity = score === undefined ? 0.45 : reveal;
+  const cellTranslate = reveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [6, 0],
+  });
+
   return (
+    <Animated.View
+      style={
+        score === undefined
+          ? { opacity: 0.6 }
+          : {
+              opacity: cellOpacity as unknown as number,
+              transform: [{ translateY: cellTranslate }],
+            }
+      }
+    >
     <View className="bg-slate-50/60 border border-slate-200/80 rounded-xl px-3 py-2.5">
       <View className="flex-row justify-between items-center mb-1.5">
         <Text
@@ -405,6 +495,7 @@ const DimensionCell = ({
         </Text>
       ) : null}
     </View>
+    </Animated.View>
   );
 };
 
