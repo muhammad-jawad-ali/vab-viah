@@ -4,6 +4,14 @@ import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  PlayfairDisplay_700Bold,
+} from '@expo-google-fonts/playfair-display';
+import {
+  Inter_400Regular,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 
 import { QueryProvider } from './src/api/QueryProvider';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -20,6 +28,11 @@ export default function App() {
   //   token, no twin  → Onboarding (resumes at last completed layer)
   //   token, twin     → Main
   const [bootReady, setBootReady] = useState(false);
+  const [fontsLoaded] = useFonts({
+    PlayfairDisplay_700Bold,
+    Inter_400Regular,
+    Inter_700Bold,
+  });
 
   useEffect(() => {
     (async () => {
@@ -50,7 +63,7 @@ export default function App() {
     })();
   }, []);
 
-  if (!bootReady) {
+  if (!bootReady || !fontsLoaded) {
     return (
       <SafeAreaProvider>
         <View
