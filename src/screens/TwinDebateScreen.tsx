@@ -36,6 +36,7 @@ import {
   DIMENSIONS,
   DIMENSION_LABELS,
   type Dimension,
+  type StoredReport,
 } from '../api/types';
 import {
   useTraceStream,
@@ -45,6 +46,7 @@ import {
   type DecisionBubble,
   type DebatePhase,
 } from '../hooks/useTraceStream';
+import { useAppStore } from '../store/useAppStore';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'TwinDebate'>;
@@ -64,6 +66,17 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
   const trace = useTraceStream(flowId);
   const scrollRef = useRef<ScrollView>(null);
 
+  // find_matches workplan emits ONE trace covering all 5 debates. After
+  // workplan.finished the SSE bus is closed and re-subscribing returns
+  // {type:'error', message:'Unknown flowId'} — so the SECOND time a user
+  // considers a candidate we render a replay-unavailable variant from the
+  // cached report rather than hanging on "Connecting".
+  const cachedReport: StoredReport | undefined = useAppStore(
+    (s) => s.reportsByFlow[flowId]?.find((r) => r.candidate_twin_id === candidateTwinId)
+  );
+  const replayUnavailable =
+    trace.status === 'error' && cachedReport !== undefined;
+
   // Auto-scroll the decision feed on each new bubble.
   useEffect(() => {
     if (trace.decisions.length === 0) return;
@@ -71,14 +84,34 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
     return () => clearTimeout(t);
   }, [trace.decisions.length]);
 
+  // Convert cached per-dim scores (0..1, no sign) into the live scoreboard's
+  // signed shape so the DimensionGrid renders the same way.
+  const scoresForGrid: Partial<Record<Dimension, { score: number; evidence: string }>> = replayUnavailable
+    ? Object.fromEntries(
+        DIMENSIONS.map((d) => {
+          const row = cachedReport.dimension_scores[d];
+          if (!row) return [d, undefined];
+          // Backend's persisted dimension_scores are 0..1 (positive). Recenter
+          // around 0 so DimensionCell's signed bar shows a meaningful tilt:
+          // score>=0.5 reads as positive, score<0.5 as negative.
+          const signed = (row.score - 0.5) * 2;
+          return [d, { score: signed, evidence: row.evidence }];
+        }).filter((e): e is [Dimension, { score: number; evidence: string }] => e[1] !== undefined)
+      )
+    : trace.dimensionScores;
+
   const headerStatusLabel =
-    trace.status === 'connecting'
-      ? 'Connecting'
-      : trace.status === 'streaming'
-        ? 'Live'
-        : trace.status === 'finished'
-          ? 'Verdict reached'
-          : 'Stream errored';
+    replayUnavailable
+      ? 'Verdict reached'
+      : trace.status === 'connecting'
+        ? 'Connecting'
+        : trace.status === 'streaming'
+          ? 'Live'
+          : trace.status === 'finished'
+            ? 'Verdict reached'
+            : 'Stream errored';
+
+  const showVerdictCta = trace.status === 'finished' || replayUnavailable;
 
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-background">
@@ -126,7 +159,7 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
             </Text>
             <Text
               className={`font-bold text-xs ${
-                trace.status === 'finished'
+                replayUnavailable || trace.status === 'finished'
                   ? 'text-emerald-700'
                   : trace.status === 'error'
                     ? 'text-rose-600'
@@ -138,7 +171,19 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
           </View>
         </View>
 
-        <PhaseRail phase={trace.phase} />
+        {replayUnavailable ? (
+          <View className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+            <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest mb-0.5">
+              ✓ Debate complete — live replay unavailable
+            </Text>
+            <Text className="text-emerald-800/80 text-[11px] leading-relaxed">
+              The Twin debate for this candidate already concluded. The
+              dimension scoreboard below is from the persisted report.
+            </Text>
+          </View>
+        ) : (
+          <PhaseRail phase={trace.phase} />
+        )}
       </View>
 
       {/* Body */}
@@ -148,19 +193,21 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
         contentContainerStyle={{ padding: 20, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {trace.status === 'error' ? (
+        {trace.status === 'error' && !replayUnavailable ? (
           <ErrorBlock error={trace.error ?? 'Stream errored'} />
         ) : null}
 
         <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mb-3">
           Dimension Scoreboard
         </Text>
-        <DimensionGrid scores={trace.dimensionScores} />
+        <DimensionGrid scores={scoresForGrid} />
 
-        <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-7 mb-3">
-          AI Reasoning Stream
-        </Text>
-        {trace.decisions.length === 0 && trace.observations.length === 0 ? (
+        {replayUnavailable ? null : (
+          <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-7 mb-3">
+            AI Reasoning Stream
+          </Text>
+        )}
+        {replayUnavailable ? null : trace.decisions.length === 0 && trace.observations.length === 0 ? (
           <View className="bg-surface border border-slate-200 rounded-2xl p-5 items-center">
             <Text className="text-slate-500 text-xs text-center">
               Waiting for the workplan to emit its first decision…
@@ -188,18 +235,20 @@ export const TwinDebateScreen = ({ navigation, route }: Props) => {
         )}
 
         {/* Collapsible tool-call log */}
-        <ToolCallSection toolCalls={trace.toolCalls} />
+        {replayUnavailable ? null : <ToolCallSection toolCalls={trace.toolCalls} />}
       </ScrollView>
 
       {/* Verdict CTA */}
-      {trace.status === 'finished' ? (
+      {showVerdictCta ? (
         <View
           className="px-5 pt-3 border-t border-slate-200/80 bg-background"
           style={{ paddingBottom: insets.bottom + 16 }}
         >
           <View className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
             <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest text-center">
-              ✓ Verdict reached — {trace.events.length} trace events
+              {replayUnavailable
+                ? '✓ Verdict reached (replay unavailable)'
+                : `✓ Verdict reached — ${trace.events.length} trace events`}
             </Text>
           </View>
           <TouchableOpacity

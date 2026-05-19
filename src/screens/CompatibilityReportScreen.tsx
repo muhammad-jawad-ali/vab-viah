@@ -30,6 +30,7 @@ import {
   type StoredReport,
   type Dimension,
 } from '../api/types';
+import { useAppStore } from '../store/useAppStore';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
@@ -40,11 +41,19 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
   const insets = useSafeAreaInsets();
   const { flowId, candidateTwinId, displayName } = route.params;
 
-  const [report, setReport] = useState<StoredReport | null>(null);
+  // Read from Zustand first — MatchPool already cached the full set when
+  // /match/results landed, so most navigations to this screen need zero
+  // network IO.
+  const cached = useAppStore((s) => s.reportsByFlow[flowId]);
+  const setReportsForFlow = useAppStore((s) => s.setReportsForFlow);
+  const cachedReport = cached?.find((r) => r.candidate_twin_id === candidateTwinId);
+
+  const [report, setReport] = useState<StoredReport | null>(cachedReport ?? null);
   const [err, setErr] = useState<string | null>(null);
   const fired = useRef<string | null>(null);
 
   useEffect(() => {
+    if (cachedReport) return;
     if (fired.current === flowId) return;
     fired.current = flowId;
 
@@ -53,8 +62,10 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
       try {
         const res = await api.match.results(flowId);
         if (cancelled) return;
+        const all = res.allDebated ?? [];
+        setReportsForFlow(flowId, all);
         const found =
-          res.allDebated.find((r) => r.candidate_twin_id === candidateTwinId) ??
+          all.find((r) => r.candidate_twin_id === candidateTwinId) ??
           res.topThree.find((r) => r.candidate_twin_id === candidateTwinId);
         if (!found) {
           setErr('No report row for this candidate.');
@@ -69,7 +80,7 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [flowId, candidateTwinId]);
+  }, [flowId, candidateTwinId, cachedReport, setReportsForFlow]);
 
   if (err) {
     return (
