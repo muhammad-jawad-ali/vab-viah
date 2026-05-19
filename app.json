@@ -17,7 +17,8 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSMicrophoneUsageDescription": "Lab-Viah uses your microphone so you can answer onboarding questions in your own voice (Urdu or English)."
       }
     },
     "android": {
@@ -27,14 +28,22 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "package": "com.hadeeed147.LabViah",
+      "permissions": ["RECORD_AUDIO"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Lab-Viah uses your microphone so you can answer onboarding questions in your own voice (Urdu or English)."
+        }
+      ]
     ],
     "extra": {
       "eas": {

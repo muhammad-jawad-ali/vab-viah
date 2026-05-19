@@ -4,12 +4,20 @@
 // round-trip it. If the model returns chip_options (low-confidence fallback),
 // we render them as tap-to-send chips.
 //
-// Text input only for MVP — voice/audioBase64 is deferred to a later session.
+// Session 7: voice input + language toggle. Mic button beside the text input
+// records at 16kHz mono (WAV LINEAR16 on iOS, AMR_WB on Android) and POSTs
+// audioBase64 instead of text. The backend STT detects the encoding from
+// magic bytes and transcribes via Google Cloud Speech-to-Text. The transcript
+// is echoed back on `turn.sttTranscript` so the user bubble shows what was
+// actually understood (low STT confidence falls through to chip_options like
+// any other layer-1 fallback).
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,10 +26,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import { SafeScreen } from '../../components/SafeScreen';
 import { api } from '../../api/client';
 import { ApiError } from '../../api/types';
-import type { Layer1Response } from '../../api/types';
+import type { Layer1Request, Layer1Response, LanguagePref } from '../../api/types';
 import { useAppStore } from '../../store/useAppStore';
 import { saveOnboardingState } from '../../api/onboardingState';
 import {
@@ -36,28 +47,97 @@ type ChatTurn = {
   role: 'agent' | 'user';
   text: string;
   chips?: string[];
+  voice?: boolean;
 };
 
 const OPENING_PROMPT =
   "Assalam-o-alaikum. I'm Layla — your AI onboarder. Tell me your name and city to get started, and we'll build your Twin from there.";
 
+// 16kHz mono — matches what the backend STT expects after detectEncoding().
+// iOS produces a WAV file with RIFF header (LINEAR16); Android produces an
+// AMR_WB file with "#!AMR-WB\n" header. Both autodetect server-side.
+const RECORDING_OPTIONS: Audio.RecordingOptions = {
+  isMeteringEnabled: false,
+  android: {
+    extension: '.amr',
+    outputFormat: Audio.AndroidOutputFormat.AMR_WB,
+    audioEncoder: Audio.AndroidAudioEncoder.AMR_WB,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 23850,
+  },
+  ios: {
+    extension: '.wav',
+    outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+    audioQuality: Audio.IOSAudioQuality.HIGH,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/webm',
+    bitsPerSecond: 128000,
+  },
+};
+
+const LANG_OPTIONS: { id: LanguagePref; label: string }[] = [
+  { id: 'en', label: 'EN' },
+  { id: 'ro_ur', label: 'Ro-Urdu' },
+  { id: 'ur', label: 'اردو' },
+];
+
 export const OnboardingLayer1Screen = () => {
   const navigation = useOnboardingNav();
   const existingSessionId = useAppStore((s) => s.onboardingSessionId);
 
+  const [language, setLanguage] = useState<LanguagePref>('en');
   const [history, setHistory] = useState<ChatTurn[]>([
     { role: 'agent', text: OPENING_PROMPT },
   ]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(existingSessionId);
+  const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   // Auto-scroll on new turns.
   useEffect(() => {
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
     return () => clearTimeout(t);
   }, [history.length, sending]);
+
+  // Pulse the mic chip while recording.
+  useEffect(() => {
+    if (!recording) {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [recording, pulseAnim]);
+
+  // Tear down any active recording on unmount so the mic isn't left hot.
+  useEffect(() => {
+    return () => {
+      const rec = recordingRef.current;
+      if (rec) {
+        rec.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+    };
+  }, []);
 
   const lastAgentChips = useMemo(() => {
     for (let i = history.length - 1; i >= 0; i--) {
@@ -68,19 +148,9 @@ export const OnboardingLayer1Screen = () => {
     return undefined;
   }, [history]);
 
-  const sendMessage = async (textToSend: string) => {
-    const trimmed = textToSend.trim();
-    if (!trimmed || sending) return;
-
-    setHistory((h) => [...h, { role: 'user', text: trimmed }]);
-    setDraft('');
-    setSending(true);
-
+  const postLayer1 = async (body: Layer1Request, optimisticBubbleIndex: number) => {
     try {
-      const res: Layer1Response = await api.onboarding.layer1({
-        ...(sessionId ? { sessionId } : {}),
-        text: trimmed,
-      });
+      const res: Layer1Response = await api.onboarding.layer1(body);
 
       const newSessionId = res.sessionId;
       setSessionId(newSessionId);
@@ -90,16 +160,26 @@ export const OnboardingLayer1Screen = () => {
         answeredCardIds: [],
       });
 
-      setHistory((h) => [
-        ...h,
-        {
-          role: 'agent',
-          text: res.turn.reply,
-          ...(res.turn.chip_options && res.turn.chip_options.length > 0
-            ? { chips: res.turn.chip_options }
-            : {}),
-        },
-      ]);
+      setHistory((h) => {
+        const next = [...h];
+        // Replace the optimistic voice placeholder with the real transcript.
+        if (res.turn.sttTranscript && next[optimisticBubbleIndex]?.role === 'user') {
+          next[optimisticBubbleIndex] = {
+            ...next[optimisticBubbleIndex]!,
+            text: res.turn.sttTranscript,
+          };
+        }
+        return [
+          ...next,
+          {
+            role: 'agent',
+            text: res.turn.reply,
+            ...(res.turn.chip_options && res.turn.chip_options.length > 0
+              ? { chips: res.turn.chip_options }
+              : {}),
+          },
+        ];
+      });
 
       if (res.turn.next_topic === 'done') {
         // Brief pause so the user sees the agent's closing reply, then advance.
@@ -112,12 +192,125 @@ export const OnboardingLayer1Screen = () => {
       const msg = err instanceof ApiError ? err.message : 'Could not send message. Try again.';
       Alert.alert('Send failed', msg);
       // Roll back the optimistic user bubble so they can retry.
-      setHistory((h) => h.slice(0, -1));
-      setDraft(trimmed);
+      setHistory((h) => {
+        const next = [...h];
+        next.splice(optimisticBubbleIndex, 1);
+        return next;
+      });
     } finally {
       setSending(false);
     }
   };
+
+  const sendMessage = async (textToSend: string) => {
+    const trimmed = textToSend.trim();
+    if (!trimmed || sending || recording) return;
+
+    setHistory((h) => [...h, { role: 'user', text: trimmed }]);
+    const optimisticIdx = history.length; // index of bubble just appended
+    setDraft('');
+    setSending(true);
+
+    await postLayer1(
+      {
+        ...(sessionId ? { sessionId } : {}),
+        language,
+        text: trimmed,
+      },
+      optimisticIdx
+    );
+  };
+
+  const startRecording = async () => {
+    if (sending || recording) return;
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert(
+          'Microphone permission needed',
+          'Lab-Viah needs microphone access to record your voice answers.'
+        );
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(RECORDING_OPTIONS);
+      await rec.startAsync();
+      recordingRef.current = rec;
+      setRecording(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not start recording.';
+      Alert.alert('Recording failed', msg);
+      recordingRef.current = null;
+      setRecording(false);
+    }
+  };
+
+  const stopRecordingAndSend = async () => {
+    const rec = recordingRef.current;
+    if (!rec) {
+      setRecording(false);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setRecording(false);
+
+    let uri: string | null = null;
+    try {
+      await rec.stopAndUnloadAsync();
+      uri = rec.getURI();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not finalize recording.';
+      Alert.alert('Recording failed', msg);
+      recordingRef.current = null;
+      return;
+    } finally {
+      recordingRef.current = null;
+    }
+
+    if (!uri) {
+      Alert.alert('Recording empty', 'No audio was captured. Try again.');
+      return;
+    }
+
+    // Drop an optimistic "🎙️ Voice…" bubble that gets replaced once the STT
+    // transcript comes back.
+    setHistory((h) => [...h, { role: 'user', text: '🎙️ Voice…', voice: true }]);
+    const optimisticIdx = history.length;
+    setSending(true);
+
+    try {
+      const audioBase64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await postLayer1(
+        {
+          ...(sessionId ? { sessionId } : {}),
+          language,
+          audioBase64,
+        },
+        optimisticIdx
+      );
+    } catch (err) {
+      setSending(false);
+      const msg = err instanceof Error ? err.message : 'Could not read recorded audio.';
+      Alert.alert('Send failed', msg);
+      setHistory((h) => {
+        const next = [...h];
+        next.splice(optimisticIdx, 1);
+        return next;
+      });
+    }
+  };
+
+  const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] });
+  const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.1] });
 
   return (
     <SafeScreen className="bg-primary-dark">
@@ -134,6 +327,38 @@ export const OnboardingLayer1Screen = () => {
               <DevSkipLink onSkip={() => devSkipOnboarding(navigation)} />
             }
           />
+
+          {/* Language toggle pill */}
+          <View className="flex-row items-center justify-end mb-2">
+            <View className="flex-row bg-primary border border-primary-light/20 rounded-full p-1">
+              {LANG_OPTIONS.map((opt) => {
+                const active = language === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    onPress={() => {
+                      if (recording || sending) return;
+                      Haptics.selectionAsync().catch(() => {});
+                      setLanguage(opt.id);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={`Language: ${opt.label}`}
+                    className={`px-3 py-1 rounded-full ${active ? 'bg-secondary' : ''}`}
+                    disabled={recording || sending}
+                  >
+                    <Text
+                      className={`text-[11px] font-bold tracking-widest uppercase ${
+                        active ? 'text-primary-dark' : 'text-primary-light/80'
+                      }`}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
 
         <ScrollView
@@ -191,11 +416,47 @@ export const OnboardingLayer1Screen = () => {
                   onPress={() => sendMessage(chip)}
                   className="bg-primary border border-secondary/40 rounded-full px-4 py-2"
                   disabled={sending}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Quick reply: ${chip}`}
                 >
                   <Text className="text-secondary text-xs font-bold">{chip}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+        )}
+
+        {recording && (
+          <View className="px-5 pb-2 flex-row items-center justify-center gap-2">
+            <View style={{ width: 10, height: 10 }}>
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: '#e9a847',
+                  opacity: pulseOpacity,
+                  transform: [{ scale: pulseScale }],
+                }}
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  left: 2,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: '#e9a847',
+                }}
+              />
+            </View>
+            <Text className="text-secondary text-[11px] uppercase tracking-widest font-bold">
+              Listening… tap stop to send
+            </Text>
           </View>
         )}
 
@@ -206,19 +467,44 @@ export const OnboardingLayer1Screen = () => {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Type your reply…"
+            placeholder={recording ? 'Listening…' : 'Type your reply…'}
             placeholderTextColor="#059669"
             multiline
-            editable={!sending}
+            editable={!sending && !recording}
             className="flex-1 bg-primary border border-primary-light/20 rounded-2xl px-4 py-3 text-surface text-[15px]"
             style={{ maxHeight: 110, minHeight: 46 }}
           />
+
+          {/* Mic button — toggles record/stop. Hidden when there's a text draft. */}
+          {draft.trim().length === 0 ? (
+            <TouchableOpacity
+              onPress={recording ? stopRecordingAndSend : startRecording}
+              disabled={sending}
+              accessibilityRole="button"
+              accessibilityLabel={recording ? 'Stop recording and send' : 'Record voice answer'}
+              accessibilityState={{ busy: recording }}
+              className={`rounded-2xl px-4 py-3 items-center justify-center ${
+                recording ? 'bg-saffron' : 'bg-primary border border-secondary/40'
+              }`}
+              style={{ minHeight: 46, opacity: sending ? 0.5 : 1 }}
+            >
+              <Text
+                className={`text-base ${recording ? 'text-primary-dark' : 'text-secondary'}`}
+                style={{ fontSize: 18, lineHeight: 20 }}
+              >
+                {recording ? '■' : '🎙'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
             onPress={() => sendMessage(draft)}
-            disabled={sending || draft.trim().length === 0}
+            disabled={sending || draft.trim().length === 0 || recording}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
             className="bg-secondary rounded-2xl px-5 py-3 items-center justify-center"
             style={{
-              opacity: sending || draft.trim().length === 0 ? 0.5 : 1,
+              opacity: sending || draft.trim().length === 0 || recording ? 0.5 : 1,
               minHeight: 46,
             }}
           >

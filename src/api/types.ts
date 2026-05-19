@@ -139,6 +139,9 @@ export type OnboardingTurnResult = {
   chip_options?: string[];
   sttConfidence?: number;
   sttStub?: boolean;
+  // Populated when audioBase64 was sent AND STT produced a non-empty transcript.
+  // The chat UI renders this in the user bubble instead of "🎙️ Voice".
+  sttTranscript?: string;
 };
 
 // Layer 1 — chat interview. Backend takes exactly one of `text` or
