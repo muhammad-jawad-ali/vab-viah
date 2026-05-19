@@ -11,8 +11,6 @@ export type BookingWaliInfo = {
   userWaliName: string;
   userWaliRelation: 'father' | 'uncle' | 'brother' | 'guardian';
   userWaliPhone: string;
-  candidateWaliName: string;
-  candidateWaliPhone: string;
   area?: string;
 };
 

@@ -319,15 +319,16 @@ export type TraceEventType = TraceEvent['type'];
 // ---------------------------------------------------------------------------
 export type WaliRelation = 'father' | 'uncle' | 'brother' | 'guardian';
 
-// Per backend POST /book/initiate Zod schema. All wali fields are required —
-// the workplan generates the wali brief synchronously.
+// Per backend POST /book/initiate Zod schema. Only the user-wali fields are
+// required — the candidate-wali fields are server-defaulted because users
+// don't realistically know their match's wali contact at booking time.
 export type BookInitiateRequest = {
   candidateTwinId: string;
   userWaliName: string;
   userWaliRelation: WaliRelation;
   userWaliPhone: string;        // E.164: /^\+\d{7,15}$/
-  candidateWaliName: string;
-  candidateWaliPhone: string;   // E.164
+  candidateWaliName?: string;
+  candidateWaliPhone?: string;  // E.164
   area?: string;
 };
 

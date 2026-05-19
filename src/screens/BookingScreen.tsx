@@ -102,18 +102,14 @@ const BookMode = ({
   const addMeeting = useAppStore((s) => s.addMeeting);
 
   // ─── Wali form state ─────────────────────────────────────────────────────
+  // We only collect the USER's wali — the candidate's wali is server-defaulted
+  // since the user doesn't realistically know their match's wali contact.
   const [userWaliName, setUserWaliName] = useState(bookingWaliInfo?.userWaliName ?? '');
   const [userWaliRelation, setUserWaliRelation] = useState<WaliRelation>(
     bookingWaliInfo?.userWaliRelation ?? 'father'
   );
   const [userWaliPhone, setUserWaliPhone] = useState(
     bookingWaliInfo?.userWaliPhone ?? '+92'
-  );
-  const [candidateWaliName, setCandidateWaliName] = useState(
-    bookingWaliInfo?.candidateWaliName ?? ''
-  );
-  const [candidateWaliPhone, setCandidateWaliPhone] = useState(
-    bookingWaliInfo?.candidateWaliPhone ?? '+92'
   );
   const [area, setArea] = useState(bookingWaliInfo?.area ?? '');
 
@@ -151,12 +147,8 @@ const BookMode = ({
       Alert.alert('Phone format', 'Your wali phone must be E.164 (e.g. +923001234567).');
       return;
     }
-    if (!/^\+\d{7,15}$/.test(candidateWaliPhone)) {
-      Alert.alert('Phone format', 'Candidate wali phone must be E.164.');
-      return;
-    }
-    if (userWaliName.trim().length === 0 || candidateWaliName.trim().length === 0) {
-      Alert.alert('Missing names', 'Both wali names are required.');
+    if (userWaliName.trim().length === 0) {
+      Alert.alert('Missing name', 'Your wali name is required.');
       return;
     }
 
@@ -168,13 +160,12 @@ const BookMode = ({
       userWaliName: userWaliName.trim(),
       userWaliRelation,
       userWaliPhone: userWaliPhone.trim(),
-      candidateWaliName: candidateWaliName.trim(),
-      candidateWaliPhone: candidateWaliPhone.trim(),
       ...(area.trim().length > 0 ? { area: area.trim() } : {}),
     };
     setBookingWaliInfo(info);
 
     try {
+      // candidateWaliName / candidateWaliPhone are server-defaulted.
       const res = await api.book.initiate({
         candidateTwinId,
         ...info,
@@ -197,8 +188,6 @@ const BookMode = ({
     userWaliName,
     userWaliRelation,
     userWaliPhone,
-    candidateWaliName,
-    candidateWaliPhone,
     area,
     setBookingWaliInfo,
   ]);
@@ -277,10 +266,6 @@ const BookMode = ({
               setUserWaliRelation={setUserWaliRelation}
               userWaliPhone={userWaliPhone}
               setUserWaliPhone={setUserWaliPhone}
-              candidateWaliName={candidateWaliName}
-              setCandidateWaliName={setCandidateWaliName}
-              candidateWaliPhone={candidateWaliPhone}
-              setCandidateWaliPhone={setCandidateWaliPhone}
               area={area}
               setArea={setArea}
               error={initiateErr}
@@ -367,10 +352,6 @@ const WaliForm = ({
   setUserWaliRelation,
   userWaliPhone,
   setUserWaliPhone,
-  candidateWaliName,
-  setCandidateWaliName,
-  candidateWaliPhone,
-  setCandidateWaliPhone,
   area,
   setArea,
   error,
@@ -382,10 +363,6 @@ const WaliForm = ({
   setUserWaliRelation: (v: WaliRelation) => void;
   userWaliPhone: string;
   setUserWaliPhone: (v: string) => void;
-  candidateWaliName: string;
-  setCandidateWaliName: (v: string) => void;
-  candidateWaliPhone: string;
-  setCandidateWaliPhone: (v: string) => void;
   area: string;
   setArea: (v: string) => void;
   error: string | null;
@@ -398,8 +375,8 @@ const WaliForm = ({
       </Text>
       <Text className="text-emerald-900/80 text-xs leading-relaxed">
         Your wali receives an auto-generated brief in two languages plus an SMS
-        preview — you can share these without their reply. The candidate's wali
-        gets a parallel brief in their language. Booking proceeds either way.
+        preview — you can share these without their reply. The candidate's
+        side is handled by us. Booking proceeds either way.
       </Text>
     </View>
 
@@ -446,21 +423,6 @@ const WaliForm = ({
       value={userWaliPhone}
       onChange={setUserWaliPhone}
       placeholder="+923001234567"
-      keyboardType="phone-pad"
-    />
-
-    <Text className="text-slate-800 font-serif text-lg font-bold mb-3 mt-2">Candidate's Wali</Text>
-    <Field
-      label="Name"
-      value={candidateWaliName}
-      onChange={setCandidateWaliName}
-      placeholder="Tariq Aslam"
-    />
-    <Field
-      label="Phone (E.164)"
-      value={candidateWaliPhone}
-      onChange={setCandidateWaliPhone}
-      placeholder="+923007654321"
       keyboardType="phone-pad"
     />
 
