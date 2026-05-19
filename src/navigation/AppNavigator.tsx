@@ -27,6 +27,7 @@ import { PaywallScreen } from '../screens/PaywallScreen';
 import { MatchPoolScreen } from '../screens/MatchPoolScreen';
 import { TwinDebateScreen } from '../screens/TwinDebateScreen';
 import { CompatibilityReportScreen } from '../screens/CompatibilityReportScreen';
+import { ReplayDebateScreen } from '../screens/ReplayDebateScreen';
 
 // Engagement & Safety
 import { BookingScreen } from '../screens/BookingScreen';
@@ -49,6 +50,7 @@ const DiscoverStack = () => (
     <Discover.Screen name="MatchPool" component={MatchPoolScreen} />
     <Discover.Screen name="TwinDebate" component={TwinDebateScreen} />
     <Discover.Screen name="CompatibilityReport" component={CompatibilityReportScreen} />
+    <Discover.Screen name="ReplayDebate" component={ReplayDebateScreen} />
     <Discover.Screen name="Paywall" component={PaywallScreen} />
   </Discover.Navigator>
 );

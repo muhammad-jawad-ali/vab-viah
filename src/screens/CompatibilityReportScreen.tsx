@@ -158,6 +158,31 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
           <CompatibilityRadar scores={report.dimension_scores} />
         </View>
 
+        {/* Replay debate as chat CTA */}
+        <TouchableOpacity
+          onPress={() => {
+            lightHaptic();
+            navigation.navigate('ReplayDebate', {
+              flowId,
+              candidateTwinId,
+              displayName,
+            });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Replay the Twin debate with ${displayName} as a chat`}
+          className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3.5 mb-5 flex-row items-center justify-between"
+        >
+          <View className="flex-1 mr-3">
+            <Text className="text-emerald-800 font-bold text-[10px] uppercase tracking-widest mb-0.5">
+              💬 Replay debate as chat
+            </Text>
+            <Text className="text-emerald-900/80 text-[11px] leading-relaxed">
+              Read the Twin-to-Twin exchange, dimension by dimension.
+            </Text>
+          </View>
+          <Text className="text-emerald-700 font-bold text-base">→</Text>
+        </TouchableOpacity>
+
         {/* 8-dim breakdown */}
         <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-5">
           <Text className="text-slate-800 font-serif text-base font-bold mb-5">

@@ -306,6 +306,23 @@ export type TraceEvent =
 export type TraceEventType = TraceEvent['type'];
 
 // ---------------------------------------------------------------------------
+// DebateMessage — parsed form of `agent.message` events for the chat replay.
+// Backend emits content via moderator.prompt.formatTurnTranscript which yields
+// strings shaped exactly `[${dim}] ${speakerName}: ${statement}`. We parse
+// once at hook-level so consumers (live debate + replay-chat) get a typed view
+// instead of regex-parsing the firehose at render time.
+// ---------------------------------------------------------------------------
+export type DebateMessageSide = 'user_twin' | 'candidate_twin' | 'moderator';
+export type DebateMessage = {
+  id: string;
+  side: DebateMessageSide;
+  dimension: Dimension | null;     // null when content didn't match `[dim] name: …`
+  speakerName: string;
+  statement: string;
+  ts: number;
+};
+
+// ---------------------------------------------------------------------------
 // Booking — POST /book/initiate, /book/confirm.
 //
 // Sources of truth:

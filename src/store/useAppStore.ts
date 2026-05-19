@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StoredReport, TwinSpec } from '../api/types';
+import type { DebateMessage, StoredReport, TwinSpec } from '../api/types';
 import type {
   OnboardingPersistedLayer,
   OnboardingPersistedState,
@@ -58,6 +58,13 @@ interface AppState {
   // replay-unavailable variant of TwinDebate instead of hanging on Connecting.
   reportsByFlow: Record<string, StoredReport[]>;
 
+  // Parsed agent.message timeline keyed by flowId. The find_matches workplan
+  // emits one trace covering all 5 parallel debates; once it ends the bus is
+  // gone, so the ReplayDebate screen reads from this cache instead of
+  // re-subscribing to a closed SSE stream. Messages are interleaved per
+  // candidate; consumers filter by speakerName to pick one debate's transcript.
+  messagesByFlow: Record<string, DebateMessage[]>;
+
   // Persisted wali contact info captured on the first booking; reused
   // (pre-filled) on subsequent /book/initiate calls so the user doesn't
   // re-type it. Backend requires user + candidate wali on every initiate.
@@ -103,6 +110,7 @@ interface AppState {
   setMeetingStatus: (meetingId: string, status: 'scheduled' | 'pending_feedback' | 'done') => void;
   setPremium: (val: boolean) => void;
   setReportsForFlow: (flowId: string, reports: StoredReport[]) => void;
+  setMessagesForFlow: (flowId: string, messages: DebateMessage[]) => void;
   setBookingWaliInfo: (info: BookingWaliInfo) => void;
   logout: () => void;
 }
@@ -136,6 +144,7 @@ export const useAppStore = create<AppState>((set) => ({
   isPremium: false,
   activeMatchId: null,
   reportsByFlow: {},
+  messagesByFlow: {},
   bookingWaliInfo: null,
 
   // Meeting
@@ -223,6 +232,11 @@ export const useAppStore = create<AppState>((set) => ({
       reportsByFlow: { ...state.reportsByFlow, [flowId]: reports },
     })),
 
+  setMessagesForFlow: (flowId, messages) =>
+    set((state) => ({
+      messagesByFlow: { ...state.messagesByFlow, [flowId]: messages },
+    })),
+
   setBookingWaliInfo: (bookingWaliInfo) => set({ bookingWaliInfo }),
 
   logout: () =>
@@ -242,6 +256,7 @@ export const useAppStore = create<AppState>((set) => ({
       onboardingAnsweredCardIds: [],
       activeMatchId: null,
       reportsByFlow: {},
+      messagesByFlow: {},
       bookingWaliInfo: null,
       activeMeetingId: null,
       activeMeetingUrl: null,

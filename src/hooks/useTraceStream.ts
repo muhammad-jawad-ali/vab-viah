@@ -12,7 +12,8 @@
 // parallel_debates → rank_reports → persist_reports.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Dimension, TraceEvent } from '../api/types';
+import type { DebateMessage, DebateMessageSide, Dimension, TraceEvent } from '../api/types';
+import { DIMENSIONS } from '../api/types';
 import { subscribe, type SseStatus, type StreamErrorPayload } from '../api/sse';
 
 export type DebatePhase =
@@ -55,6 +56,8 @@ export type TraceStreamState = {
   dimensionScores: Partial<Record<Dimension, DimensionScoreEntry>>;
   recoveries: { id: string; reason: string; action: string; ts: number }[];
   toolCalls: { id: string; tool: string; args: unknown; ts: number }[];
+  /** Parsed agent.message stream — feeds the chat replay UI. */
+  messages: DebateMessage[];
   /** outcome payload from workplan.finished, if any */
   outcome: unknown;
   error: string | null;
@@ -69,6 +72,7 @@ const INITIAL: TraceStreamState = {
   dimensionScores: {},
   recoveries: [],
   toolCalls: [],
+  messages: [],
   outcome: null,
   error: null,
 };
@@ -198,8 +202,11 @@ function applyEvent(
       next.status = 'finished';
       next.outcome = ev.outcome;
       return next;
-    case 'agent.message':
+    case 'agent.message': {
+      const parsed = parseAgentMessage(ev, nextId);
+      if (parsed) next.messages = [...s.messages, parsed];
       return next;
+    }
     default: {
       // Exhaustiveness check — surfaces a compile error if TraceEvent grows.
       const _exhaust: never = ev;
@@ -207,6 +214,45 @@ function applyEvent(
       return next;
     }
   }
+}
+
+// Parse a backend agent.message event into a DebateMessage. Moderator emits
+// content via formatTurnTranscript → `[${dim}] ${speakerName}: ${statement}`,
+// so we extract the dimension + speaker + statement once here so the chat
+// replay UI doesn't have to regex-parse strings at render time.
+const TRANSCRIPT_RE = /^\[(\w+)\]\s+([^:]+?):\s+([\s\S]+)$/;
+const DIMENSION_SET = new Set<string>(DIMENSIONS);
+
+function parseAgentMessage(
+  ev: Extract<TraceEvent, { type: 'agent.message' }>,
+  nextId: () => string
+): DebateMessage | null {
+  const side: DebateMessageSide | null =
+    ev.agent === 'user_twin' || ev.agent === 'candidate_twin' || ev.agent === 'moderator'
+      ? (ev.agent as DebateMessageSide)
+      : null;
+  if (!side) return null;
+  const match = TRANSCRIPT_RE.exec(ev.content);
+  if (match) {
+    const [, rawDim, rawName, rawStatement] = match;
+    const dim = rawDim && DIMENSION_SET.has(rawDim) ? (rawDim as Dimension) : null;
+    return {
+      id: nextId(),
+      side,
+      dimension: dim,
+      speakerName: (rawName ?? '').trim(),
+      statement: (rawStatement ?? '').trim(),
+      ts: ev.ts,
+    };
+  }
+  return {
+    id: nextId(),
+    side,
+    dimension: null,
+    speakerName: side === 'moderator' ? 'Moderator' : '',
+    statement: ev.content,
+    ts: ev.ts,
+  };
 }
 
 /** Convenience: useTraceStream consumers often want a sorted dim array. */

@@ -313,6 +313,18 @@ export const MatchPoolScreen = ({ navigation }: Props) => {
 
   const trace = useTraceStream(flowId);
   const setReportsForFlow = useAppStore((s) => s.setReportsForFlow);
+  const setMessagesForFlow = useAppStore((s) => s.setMessagesForFlow);
+
+  // MatchPool is the live SSE subscriber for the find_matches workplan; cache
+  // the parsed debate transcript per flowId so ReplayDebateScreen can replay
+  // it after the bus is gone. Snapshotting on every length change is fine —
+  // messages are append-only and the array is small (~80 entries for 5
+  // debates × 8 dims × 2 sides).
+  useEffect(() => {
+    if (!flowId) return;
+    if (trace.messages.length === 0) return;
+    setMessagesForFlow(flowId, trace.messages);
+  }, [flowId, trace.messages, setMessagesForFlow]);
 
   // Kick /match/request and update flowId. Called from the initial mount
   // effect AND from "Run New Match" retry — having a stand-alone function

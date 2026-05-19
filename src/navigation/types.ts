@@ -7,6 +7,7 @@ export type DiscoverStackParamList = {
   // row from /match/results without an extra lookup.
   TwinDebate: { flowId: string; candidateTwinId: string; displayName: string };
   CompatibilityReport: { flowId: string; candidateTwinId: string; displayName: string };
+  ReplayDebate: { flowId: string; candidateTwinId: string; displayName: string };
   Paywall: undefined;
 };
 
