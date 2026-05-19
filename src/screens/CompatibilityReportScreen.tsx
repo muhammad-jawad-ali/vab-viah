@@ -31,6 +31,7 @@ import {
   type Dimension,
 } from '../api/types';
 import { useAppStore } from '../store/useAppStore';
+import { Skeleton } from '../components/Skeleton';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
@@ -323,10 +324,42 @@ const DimensionRow = ({ dim, row, delay }: RowProps) => {
 const LoadingView = ({ insets }: { insets: { top: number } }) => (
   <View
     style={{ paddingTop: insets.top }}
-    className="flex-1 bg-background items-center justify-center"
+    className="flex-1 bg-background px-5"
   >
-    <ActivityIndicator size="large" color="#059669" />
-    <Text className="text-slate-500 text-sm mt-4">Loading report…</Text>
+    <View className="bg-emerald-950/5 border-b border-emerald-900/10 px-4 py-2 -mx-5 flex-row items-center mb-6">
+      <View className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
+      <Text
+        className="text-emerald-800 font-mono text-[9px] uppercase tracking-widest flex-1"
+      >
+        AG-TRACE // LOADING REPORT
+      </Text>
+    </View>
+    <View className="items-center my-4">
+      <Skeleton width={140} height={10} />
+      <View style={{ height: 10 }} />
+      <Skeleton width={200} height={22} />
+      <View style={{ height: 16 }} />
+      <Skeleton width={128} height={128} rounded={64} />
+      <View style={{ height: 14 }} />
+      <Skeleton width={130} height={22} rounded={999} />
+    </View>
+    <View className="bg-surface border border-slate-200 rounded-3xl p-5 mt-4">
+      <Skeleton width="45%" height={14} />
+      <View style={{ height: 18 }} />
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <View key={i} style={{ marginBottom: 16 }}>
+          <View className="flex-row justify-between mb-2">
+            <Skeleton width={80} height={10} />
+            <Skeleton width={36} height={10} />
+          </View>
+          <Skeleton height={8} rounded={4} />
+        </View>
+      ))}
+    </View>
+    <View className="items-center mt-4">
+      <ActivityIndicator size="small" color="#059669" />
+      <Text className="text-slate-500 text-[11px] mt-2">Loading report…</Text>
+    </View>
   </View>
 );
 
@@ -343,12 +376,21 @@ const ErrorView = ({
     style={{ paddingTop: insets.top }}
     className="flex-1 bg-background items-center justify-center px-8"
   >
-    <Text className="text-rose-700 font-serif text-xl mb-2 text-center">
+    <View className="w-20 h-20 rounded-full bg-rose-50 border border-rose-200 items-center justify-center mb-5">
+      <Text className="text-4xl">⚠️</Text>
+    </View>
+    <Text className="text-rose-700 font-serif text-h2 mb-2 text-center">
       Report unavailable
     </Text>
-    <Text className="text-slate-500 text-sm text-center mb-6">{err}</Text>
+    <View className="bg-rose-50/60 border border-rose-200 rounded-2xl px-4 py-3 mb-6 w-full">
+      <Text className="text-rose-700 text-[11px] text-center leading-relaxed">
+        {err}
+      </Text>
+    </View>
     <Pressable
       onPress={onBack}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
       className="bg-primary px-6 py-3 rounded-full active:opacity-80"
     >
       <Text className="text-surface font-bold text-xs uppercase tracking-widest">

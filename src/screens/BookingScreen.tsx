@@ -45,6 +45,7 @@ import {
 } from '../api/types';
 import { useTraceStream } from '../hooks/useTraceStream';
 import { useAppStore, type BookingWaliInfo } from '../store/useAppStore';
+import { Skeleton } from '../components/Skeleton';
 
 type Props = {
   navigation: NativeStackNavigationProp<MeetingStackParamList, 'Booking'>;
@@ -500,20 +501,58 @@ const Field = ({
 // =========================================================================
 
 const InitiatingState = ({ phaseLabel, eventCount }: { phaseLabel: string; eventCount: number }) => (
-  <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-6 items-center">
-    <ActivityIndicator size="large" color="#059669" />
-    <Text className="text-slate-900 font-serif text-lg mt-5 mb-2">Building your booking</Text>
-    <Text className="text-slate-500 text-sm text-center mb-5 leading-relaxed">
-      The Wali agent is writing briefs in two languages while the Booking agent
-      picks slots and venues. This usually takes ~10 seconds.
+  <View>
+    {/* Live phase indicator on top */}
+    <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 items-center mb-4">
+      <View className="flex-row items-center mb-2">
+        <ActivityIndicator size="small" color="#059669" />
+        <Text className="text-slate-900 font-serif text-base ml-3">
+          Building your booking
+        </Text>
+      </View>
+      <Text className="text-slate-500 text-[12px] text-center mb-3 leading-relaxed">
+        The Wali agent is writing briefs while the Booking agent picks slots
+        and venues. Usually ~10 seconds.
+      </Text>
+      <View className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
+        <Text className="text-emerald-800 font-mono text-[10px] uppercase tracking-widest text-center">
+          {phaseLabel}
+        </Text>
+        <Text className="text-emerald-700/70 text-[11px] text-center mt-1">
+          {eventCount} trace events
+        </Text>
+      </View>
+    </View>
+
+    {/* Slot list skeleton — 3 rows */}
+    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] mb-2">
+      Slots loading
     </Text>
-    <View className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
-      <Text className="text-emerald-800 font-mono text-[10px] uppercase tracking-widest">
-        {phaseLabel}
-      </Text>
-      <Text className="text-emerald-700/70 text-[11px] text-center mt-1">
-        {eventCount} trace events
-      </Text>
+    {[0, 1, 2].map((i) => (
+      <View
+        key={i}
+        className="bg-surface border border-slate-200 rounded-2xl p-5 mb-3 shadow-sm"
+      >
+        <View className="flex-row justify-between mb-3">
+          <Skeleton width="55%" height={18} />
+          <Skeleton width={26} height={14} />
+        </View>
+        <View className="flex-row items-center">
+          <Skeleton width={20} height={20} rounded={6} />
+          <View className="ml-2 flex-1">
+            <Skeleton width="70%" height={14} />
+            <View style={{ height: 6 }} />
+            <Skeleton width="45%" height={12} />
+          </View>
+        </View>
+      </View>
+    ))}
+
+    {/* Wali brief panel collapsed-state skeleton */}
+    <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl mt-2 px-5 py-4">
+      <Skeleton width="35%" height={10} />
+      <View style={{ height: 6 }} />
+      <Skeleton width="55%" height={14} />
     </View>
   </View>
 );
