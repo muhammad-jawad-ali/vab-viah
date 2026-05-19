@@ -197,7 +197,7 @@
 - **Rebuild the APK** to pick up the `expo-av` native module + mic permission added in app.json. The user aborted the pre-Session-7 APK build; relaunch via `npx eas-cli build --profile preview --platform android` after Session 7 lands on Railway. EAS Update will NOT propagate the mic permission — only a native build will.
 - Run the F4 19-step walkthrough on a real device against Railway. Annotate
   any deviations under "Live device walkthrough" in DEMO_SCRIPT.md.
-- Probe Maps via `curl https://lab-viah-production.up.railway.app/health/maps?city=Karachi` — if `verdict: 'places_api_failed'`, walk through GCP console (billing linked + API key restrictions cleared + "Places API (New)" included in key's API restrictions). If `verdict: 'live'`, voice + Maps are both demo-ready.
+- Maps verified live at session close — Karachi/Lahore/Islamabad all return real venues from Places API. No further action needed unless the API key rotates or quota changes.
 - Round-trip a real Urdu voice clip through Layer-1 onboarding on the fresh APK to confirm STT + transcript bubble + agent reply all flow correctly.
 - Decide on the onboarding-in-demo approach (SQL reset vs skip live).
 - Merge `integration/session-1-foundation` → `main` decision deferred to user.
@@ -208,7 +208,11 @@
 
 ### Known broken on demo day (be honest with judges)
 
-1. **Google Maps Places API state UNVERIFIED at session close.** User reported enabling "Places API (New)" in GCP between Session 6 and 7. Whether billing is linked + key restrictions are clear is still untested. Post-Session-7 `curl /health/maps?city=Karachi` will give the definitive answer — `verdict: 'live'` means the booking flow shows real Maps venues; `verdict: 'places_api_failed'` means the existing hardcoded-5-venue fallback per city handles the demo (trace emits a `recover` event for the AG-trace UI, `venueFromFallback: true` Railway log lines stay grep-able).
+1. **Google Maps Places API is LIVE.** ✅ Verified at Session 7 close via the new `/health/maps` endpoint. Three cities probed:
+   - Karachi → `Saltanat Restaurant` from `maps_places`, 639ms, 1 attempt
+   - Lahore → `Arcadian Café` from `maps_places`, 608ms, 1 attempt
+   - Islamabad F-7 → `Clove Cafe` from `maps_places`, 299ms, 1 attempt
+   All return `verdict: 'live'`, `usedFallback: false`. The Session 6 known-broken "Maps Places API stays dead" is resolved — the user's GCP-console enabling of "Places API (New)" + billing + key restrictions all landed correctly. Booking flow will now propose real Maps venues. The hardcoded fallback list remains as a safety net but should not be hit during the demo.
 2. **`gemini primary attempt failed` warns may still appear sporadically.** The wrapper logs `warn` on every primary attempt failure including the retry that recovers — Pro on the wali brief + moderator final synthesis can still 429 under burst load. With Layer-1 + dispute downgraded to Flash, total Pro pressure dropped considerably, but the warn line is normal Vertex-quota noise. The real failure mode (cascade to deterministic fallback) is rare now.
 3. **Layer-1 onboarding voice quality on Flash vs Pro.** Flash is good-enough for structured field extraction but the natural-language reply quality drops slightly. If the demo runs through onboarding live (vs SQL-resetting to a pre-forged twin per DEMO_SCRIPT.md §F4), judges may see slightly more chip-fallback turns than they would on Pro. Acceptable trade for the quota relief.
 4. **STT accuracy varies by accent and noise floor.** Google Speech-to-Text v1 with `latest_short` model + dual ur-PK/en-US alternatives handles most Pakistani-English code-switching but a noisy room / heavy accent / very short utterance can still produce low-confidence results — at which point the existing chip-fallback path kicks in (the user sees "Sorry, I didn't catch that. Pick one of these..." with the topic-specific chips, identical to the pre-voice flow). This is by design — voice augments the chat, doesn't replace the fallback.
