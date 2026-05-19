@@ -32,6 +32,7 @@ import {
 } from '../api/types';
 import { useAppStore } from '../store/useAppStore';
 import { Skeleton } from '../components/Skeleton';
+import { CompatibilityRadar } from '../components/CompatibilityRadar';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'CompatibilityReport'>;
@@ -142,6 +143,14 @@ export const CompatibilityReportScreen = ({ navigation, route }: Props) => {
               {recLabel}
             </Text>
           </View>
+        </View>
+
+        {/* 8-dim radar chart */}
+        <View className="bg-surface border border-slate-200 shadow-sm rounded-3xl p-5 mb-5 items-center">
+          <Text className="text-slate-800 font-serif text-base font-bold mb-4 self-start">
+            Compatibility Radar
+          </Text>
+          <CompatibilityRadar scores={report.dimension_scores} />
         </View>
 
         {/* 8-dim breakdown */}
