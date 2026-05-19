@@ -38,6 +38,7 @@ import {
 } from '../api/types';
 import { useTraceStream, PHASE_LABEL } from '../hooks/useTraceStream';
 import { useAppStore } from '../store/useAppStore';
+import { Skeleton } from '../components/Skeleton';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'MatchPool'>;
@@ -552,17 +553,52 @@ const LoadingState = ({
   decisions: number;
   dimsScored: number;
 }) => (
-  <View className="flex-1 items-center justify-center px-8">
-    <ActivityIndicator size="large" color="#059669" />
-    <Text className="text-slate-900 font-serif text-xl mt-6 mb-2">
-      Running Twin debates
-    </Text>
-    <Text className="text-slate-500 text-sm text-center mb-6">
-      Your AI Twin is negotiating with 5 candidates across 8 compatibility
-      dimensions. This usually takes 30–45 seconds.
-    </Text>
-    <View className="bg-surface border border-slate-200 rounded-2xl px-5 py-3">
-      <Text className="text-primary font-mono text-[10px] uppercase tracking-widest text-center">
+  <View className="flex-1 px-5 pt-2">
+    {/* Deck-shaped skeleton — 3 stacked rounded rects */}
+    <View style={{ height: 380 }} className="relative">
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: i * 8,
+            transform: [{ scale: 1 - i * 0.04 }],
+            opacity: 1 - i * 0.25,
+            zIndex: 3 - i,
+          }}
+        >
+          <View className="bg-surface rounded-[28px] p-5 border border-slate-200">
+            <View className="flex-row items-center mb-4">
+              <Skeleton width={80} height={80} rounded={16} />
+              <View className="flex-1 ml-4">
+                <Skeleton width="70%" height={18} />
+                <View style={{ height: 8 }} />
+                <View className="flex-row">
+                  <Skeleton width={60} height={20} rounded={999} />
+                  <View style={{ width: 8 }} />
+                  <Skeleton width={90} height={20} rounded={999} />
+                </View>
+              </View>
+            </View>
+            <Skeleton height={56} rounded={12} />
+            <View style={{ height: 10 }} />
+            <Skeleton height={56} rounded={12} />
+          </View>
+        </View>
+      ))}
+    </View>
+
+    {/* Live phase + decision/dim counter */}
+    <View className="bg-surface border border-slate-200 rounded-2xl px-5 py-4 mt-6 mx-2">
+      <View className="flex-row items-center justify-center mb-2">
+        <ActivityIndicator size="small" color="#059669" />
+        <Text className="text-slate-900 font-serif text-base ml-3">
+          Running Twin debates
+        </Text>
+      </View>
+      <Text className="text-primary font-mono text-[10px] uppercase tracking-widest text-center mt-1">
         {phase}
       </Text>
       <Text className="text-slate-500 text-[11px] mt-1.5 text-center">
@@ -580,12 +616,21 @@ const ErrorState = ({
   onRetry: () => void;
 }) => (
   <View className="flex-1 items-center justify-center px-8">
-    <Text className="text-rose-600 font-serif text-xl mb-2 text-center">
+    <View className="w-20 h-20 rounded-full bg-rose-50 border border-rose-200 items-center justify-center mb-5">
+      <Text className="text-4xl">⚠️</Text>
+    </View>
+    <Text className="text-rose-700 font-serif text-h2 mb-2 text-center">
       Couldn't load matches
     </Text>
-    <Text className="text-slate-500 text-sm text-center mb-6">{message}</Text>
+    <View className="bg-rose-50/60 border border-rose-200 rounded-2xl px-4 py-3 mb-6 w-full">
+      <Text className="text-rose-700 text-[11px] text-center leading-relaxed">
+        {message}
+      </Text>
+    </View>
     <Pressable
       onPress={onRetry}
+      accessibilityRole="button"
+      accessibilityLabel="Retry loading matches"
       className="bg-primary px-6 py-3 rounded-full active:opacity-80"
     >
       <Text className="text-surface font-bold text-xs uppercase tracking-widest">
@@ -597,15 +642,22 @@ const ErrorState = ({
 
 const EmptyState = ({ onRetry }: { onRetry: () => void }) => (
   <View className="flex-1 items-center justify-center px-8">
-    <Text className="text-slate-900 font-serif text-xl mb-2 text-center">
+    <View
+      className="w-20 h-20 rounded-full bg-saffron/10 border border-saffron/30 items-center justify-center mb-5"
+    >
+      <Text className="text-4xl">✨</Text>
+    </View>
+    <Text className="text-slate-900 font-serif text-h2 mb-2 text-center">
       No more candidates
     </Text>
-    <Text className="text-slate-500 text-sm text-center mb-6">
-      You've reviewed everyone in this batch. Pull a fresh debate to see new
-      candidates.
+    <Text className="text-slate-500 text-sm text-center mb-6 leading-relaxed">
+      You've reviewed everyone in this batch. Run a fresh debate to surface
+      new candidates.
     </Text>
     <Pressable
       onPress={onRetry}
+      accessibilityRole="button"
+      accessibilityLabel="Run a new match request"
       className="bg-primary px-6 py-3 rounded-full active:opacity-80"
     >
       <Text className="text-surface font-bold text-xs uppercase tracking-widest">
