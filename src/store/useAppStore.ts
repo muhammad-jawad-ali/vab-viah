@@ -7,20 +7,6 @@ import type {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Match {
-  id: string;
-  name: string;
-  blurAvatar: string;
-  compatibility: number;
-  tags: string[];
-  status: 'new' | 'negotiating' | 'revealed';
-}
-
-interface DebateMessage {
-  speaker: 'userTwin' | 'candidateTwin' | 'moderator';
-  text: string;
-}
-
 export type BookingWaliInfo = {
   userWaliName: string;
   userWaliRelation: 'father' | 'uncle' | 'brother' | 'guardian';
@@ -63,11 +49,9 @@ interface AppState {
   onboardingLastLayer: OnboardingPersistedLayer;
   onboardingAnsweredCardIds: string[];
 
-  // Matches & debate
-  matches: Match[];
+  // Premium gate
   isPremium: boolean;
   activeMatchId: string | null;
-  debateLog: DebateMessage[];
 
   // Reports cache keyed by flowId. find_matches emits one trace per flowId
   // covering all 5 debates; after workplan.finished the SSE bus is closed and
@@ -150,36 +134,16 @@ export const useAppStore = create<AppState>((set) => ({
   onboardingLastLayer: 0,
   onboardingAnsweredCardIds: [],
 
-  // Matches
-  matches: [
-    { id: '1', name: 'Ayesha K.', blurAvatar: 'https://i.pravatar.cc/150?u=1', compatibility: 94, tags: ['Deen Aligned', 'Career Focused'], status: 'new' },
-    { id: '2', name: 'Fatima Z.', blurAvatar: 'https://i.pravatar.cc/150?u=2', compatibility: 88, tags: ['Family Oriented', 'Same Sect'], status: 'new' },
-  ],
+  // Premium gate
   isPremium: false,
   activeMatchId: null,
   reportsByFlow: {},
   bookingWaliInfo: null,
 
-  // Debate log
-  debateLog: [
-    { speaker: 'userTwin', text: 'Career growth is essential. Relocation is acceptable if parity remains.' },
-    { speaker: 'candidateTwin', text: 'We prioritize family proximity, but are open to 1-2 years abroad.' },
-    { speaker: 'moderator', text: 'Friction point identified: Geography. Potential compromise mapped.' },
-  ],
-
   // Meeting
   activeMeetingId: null,
   activeMeetingUrl: null,
-  meetingsList: [
-    {
-      id: 'meet_past_1',
-      matchName: 'Fatima Z.',
-      slotDay: 'Last Friday',
-      slotTime: '08:00 PM',
-      type: 'Virtual',
-      status: 'done',
-    }
-  ],
+  meetingsList: [],
 
   // ─── Action implementations ───────────────────────────────────────────────
 
@@ -283,16 +247,7 @@ export const useAppStore = create<AppState>((set) => ({
       bookingWaliInfo: null,
       activeMeetingId: null,
       activeMeetingUrl: null,
-      meetingsList: [
-        {
-          id: 'meet_past_1',
-          matchName: 'Fatima Z.',
-          slotDay: 'Last Friday',
-          slotTime: '08:00 PM',
-          type: 'Virtual',
-          status: 'done',
-        }
-      ],
+      meetingsList: [],
       user: { name: 'User', isWaliMode: false },
     }),
 }));

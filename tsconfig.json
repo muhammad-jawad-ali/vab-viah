@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["node_modules", "src/screens/_archive"]
+  "exclude": ["node_modules"]
 }
