@@ -21,7 +21,6 @@ import { OnboardingLayer2Screen } from '../screens/onboarding/OnboardingLayer2Sc
 import { OnboardingLayer3Screen } from '../screens/onboarding/OnboardingLayer3Screen';
 import { OnboardingWaliScreen } from '../screens/onboarding/OnboardingWaliScreen';
 import { OnboardingFinalizeScreen } from '../screens/onboarding/OnboardingFinalizeScreen';
-import { WaliDashboardScreen } from '../screens/WaliDashboardScreen';
 
 // Discovery & Gating
 import { PaywallScreen } from '../screens/PaywallScreen';
@@ -142,24 +141,6 @@ const MeetingsIcon = ({ focused }: { focused: boolean }) => (
   </View>
 );
 
-const WaliIcon = ({ focused }: { focused: boolean }) => (
-  <View className="w-6 h-6 justify-center items-center">
-    <View
-      style={{ borderColor: focused ? '#064e3b' : '#94a3b8' }}
-      className="w-4 h-[18px] border-[1.5px] rounded-b-[7px] rounded-t-[2px] items-center justify-center"
-    >
-      <View
-        style={{ backgroundColor: focused ? '#064e3b' : '#94a3b8' }}
-        className="w-1 h-1 rounded-full mb-0.5"
-      />
-      <View
-        style={{ backgroundColor: focused ? '#064e3b' : '#94a3b8' }}
-        className="w-[1.5px] h-1"
-      />
-    </View>
-  </View>
-);
-
 const ProfileIcon = ({ focused }: { focused: boolean }) => (
   <View className="w-6 h-6 justify-center items-center">
     <View
@@ -207,14 +188,6 @@ const MainTabs = () => (
       options={{
         title: 'Meetings',
         tabBarIcon: ({ focused }) => <MeetingsIcon focused={focused} />,
-      }}
-    />
-    <Tab.Screen
-      name="WaliTab"
-      component={WaliDashboardScreen}
-      options={{
-        title: 'Wali',
-        tabBarIcon: ({ focused }) => <WaliIcon focused={focused} />,
       }}
     />
     <Tab.Screen

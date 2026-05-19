@@ -26,7 +26,6 @@ export type ProfileStackParamList = {
 export type MainTabsParamList = {
   DiscoverTab: NavigatorScreenParams<DiscoverStackParamList>;
   MeetingsTab: NavigatorScreenParams<MeetingStackParamList>;
-  WaliTab: undefined;
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
 };
 
