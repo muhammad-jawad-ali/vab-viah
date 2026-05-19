@@ -45,16 +45,24 @@ import { clearAuth, getAuthTokenSync } from './auth';
 
 // ---------------------------------------------------------------------------
 // Base URL resolution. EXPO_PUBLIC_API_URL is inlined at bundle time.
-// Fallback to localhost so the app still boots if the env is missing.
+//
+// Fallback is the Railway production URL (not localhost). Reasoning: EAS
+// Update bundles published from a machine where Metro doesn't pick up the
+// local .env (which happens on some CI/non-shell invocations) would otherwise
+// ship a localhost URL to every teammate's phone — surfacing as the "Network
+// error" the team hit during demo prep. Railway-as-default means the bundle
+// always lands on a reachable host; the dev-loop override via .env still
+// works locally and the dev-only console.warn surfaces the silent fallback.
 // ---------------------------------------------------------------------------
-const RAW_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+const PROD_FALLBACK_URL = 'https://lab-viah-production.up.railway.app';
+const RAW_BASE = process.env.EXPO_PUBLIC_API_URL ?? PROD_FALLBACK_URL;
 export const API_BASE_URL = RAW_BASE.replace(/\/$/, '');
 
 if (!process.env.EXPO_PUBLIC_API_URL && __DEV__) {
   // eslint-disable-next-line no-console
   console.warn(
-    '[api] EXPO_PUBLIC_API_URL not set — defaulting to http://localhost:3000. ' +
-      'On a physical device this will not work; use your laptop LAN IP or `expo start --tunnel`.'
+    `[api] EXPO_PUBLIC_API_URL not set — defaulting to ${PROD_FALLBACK_URL}. ` +
+      'Set EXPO_PUBLIC_API_URL in .env to point at a local backend during dev.'
   );
 }
 
