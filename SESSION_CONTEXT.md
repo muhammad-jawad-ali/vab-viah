@@ -236,7 +236,7 @@ twin debates were truncating on Pro outputs → not demo-worthy.
   - `/health/maps?city=Karachi` returns `verdict:"live"`, Saltanat Restaurant from `maps_places`, 636ms.
 - [x] **Frontend repointed.** `eas.json` all three profiles + `src/api/client.ts` PROD_FALLBACK_URL + local `.env` swapped to Render URL. Old Railway URL kept commented as legacy reference.
 - [x] **Final EAS Update**: group `6cccdcbb-d646-4ce3-b2aa-fbff16f4c12e` (commit `699f710`) published to preview channel — auto-pulls into Expo Go + existing iOS/Android preview builds on next launch.
-- [x] **Final Android APK**: build `a993972d-e69c-4f28-b80f-0c3e77fcecbf` queued with Render URL baked in. Supersedes all prior APKs.
+- [x] **Final Android APK FINISHED**: build `a993972d-e69c-4f28-b80f-0c3e77fcecbf` at commit `699f710`. Install link: **https://expo.dev/artifacts/eas/mWwgzZpNBeggJxJNb6wo9p.apk** — Render URL baked in. Supersedes all prior APKs (`9d971f55`, `cb043a6a`, `11ec2e3d`).
 
 ⚠️ **Render free-tier note for demo day**: idle service spins down after 15 min. Hit `curl https://lab-viah-backend.onrender.com/health/maps?city=Karachi` ~2-3 min BEFORE starting the demo to warm the container. First cold request takes ~30s; subsequent requests are normal.
 
