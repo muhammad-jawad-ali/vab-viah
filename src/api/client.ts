@@ -56,7 +56,12 @@ import { clearAuth, getAuthTokenSync } from './auth';
 // always lands on a reachable host; the dev-loop override via .env still
 // works locally and the dev-only console.warn surfaces the silent fallback.
 // ---------------------------------------------------------------------------
-const PROD_FALLBACK_URL = 'https://lab-viah-production.up.railway.app';
+// Switched from Railway to Render mid-Session-7 — Railway paused deploys
+// while we were still iterating. The bundle's runtime API URL still comes
+// from EAS env (EXPO_PUBLIC_API_URL injected per profile in eas.json); this
+// constant is only the last-resort default for bundles that somehow ship
+// without the env at all.
+const PROD_FALLBACK_URL = 'https://lab-viah-backend.onrender.com';
 const RAW_BASE = process.env.EXPO_PUBLIC_API_URL ?? PROD_FALLBACK_URL;
 export const API_BASE_URL = RAW_BASE.replace(/\/$/, '');
 
