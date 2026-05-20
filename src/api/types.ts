@@ -404,6 +404,9 @@ export type Venue = {
   source: 'maps_places' | 'fallback';
   placeId: string | null;
   mapsUrl: string;
+  // Google Static Maps URL — drop into an <Image> for an inline preview.
+  // Null when backend has no API key configured.
+  staticMapUrl: string | null;
 };
 
 export type SlotProposal = {

@@ -20,7 +20,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Share,
@@ -620,17 +622,40 @@ const SlotPicker = ({
               #{p.index + 1}
             </Text>
           </View>
-          <View className="flex-row items-start mb-1.5">
-            <Text className="text-slate-400 text-base mr-2">📍</Text>
-            <View className="flex-1">
-              <Text className="text-slate-700 font-bold text-sm">{p.venue.name}</Text>
-              <Text className="text-slate-500 text-xs">
-                {p.venue.area}
-                {p.venue.rating ? `  •  ★ ${p.venue.rating.toFixed(1)}` : ''}
-                {p.venueFromFallback ? '  •  curated' : ''}
-              </Text>
-            </View>
+          <View className="mb-2">
+            <Text className="text-slate-700 font-bold text-sm">{p.venue.name}</Text>
+            <Text className="text-slate-500 text-xs">
+              {p.venue.area}
+              {p.venue.rating ? `  •  ★ ${p.venue.rating.toFixed(1)}` : ''}
+              {p.venueFromFallback ? '  •  curated' : ''}
+            </Text>
           </View>
+
+          {/* Inline map thumbnail — tap to open in Google Maps. Renders only
+              when backend supplied a Static Maps URL (requires GOOGLE_MAPS_API_KEY). */}
+          {p.venue.staticMapUrl ? (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation?.();
+                Linking.openURL(p.venue.mapsUrl).catch(() => {});
+              }}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${p.venue.name} in Google Maps`}
+              activeOpacity={0.85}
+              className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+            >
+              <Image
+                source={{ uri: p.venue.staticMapUrl }}
+                style={{ width: '100%', height: 120 }}
+                resizeMode="cover"
+              />
+              <View className="absolute bottom-1.5 right-1.5 bg-white/95 rounded-full px-2.5 py-1 border border-slate-200">
+                <Text className="text-primary text-[10px] font-bold uppercase tracking-widest">
+                  Open in Maps ↗
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ) : null}
         </TouchableOpacity>
       );
     })}
