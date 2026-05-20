@@ -29,6 +29,7 @@ import {
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { SafeScreen } from '../../components/SafeScreen';
 import { api } from '../../api/client';
 import { ApiError } from '../../api/types';
@@ -82,6 +83,37 @@ const RECORDING_OPTIONS: Audio.RecordingOptions = {
     bitsPerSecond: 128000,
   },
 };
+
+// Clean SVG glyphs — replace the cringe-y emoji 🎙 / ■ pair. Stroke-only,
+// 1.75px weight, no fill. Color is driven by the `color` prop so the
+// idle/recording states can swap saffron <-> dark-teal without an asset rebuild.
+const MicGlyph = ({ color, size = 20 }: { color: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x={9}
+      y={3}
+      width={6}
+      height={11}
+      rx={3}
+      stroke={color}
+      strokeWidth={1.75}
+    />
+    <Path
+      d="M6 11v1a6 6 0 0 0 12 0v-1"
+      stroke={color}
+      strokeWidth={1.75}
+      strokeLinecap="round"
+    />
+    <Path d="M12 18v3" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+    <Path d="M9 21h6" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+  </Svg>
+);
+
+const StopGlyph = ({ color, size = 20 }: { color: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={6.5} y={6.5} width={11} height={11} rx={2.5} fill={color} />
+  </Svg>
+);
 
 const LANG_OPTIONS: { id: LanguagePref; label: string }[] = [
   { id: 'en', label: 'EN' },
@@ -491,7 +523,7 @@ export const OnboardingLayer1Screen = () => {
                 ? 'Listening…'
                 : transcribing
                   ? 'Transcribing…'
-                  : 'Type your reply or tap 🎙'
+                  : 'Type your reply…'
             }
             placeholderTextColor="#059669"
             multiline
@@ -509,17 +541,20 @@ export const OnboardingLayer1Screen = () => {
             accessibilityRole="button"
             accessibilityLabel={recording ? 'Stop recording and preview transcript' : 'Record voice answer'}
             accessibilityState={{ busy: recording || transcribing }}
-            className={`rounded-2xl px-4 py-3 items-center justify-center ${
+            className={`rounded-2xl items-center justify-center ${
               recording ? 'bg-saffron' : 'bg-primary border border-secondary/40'
             }`}
-            style={{ minHeight: 46, opacity: sending || transcribing ? 0.5 : 1 }}
+            style={{
+              minHeight: 46,
+              minWidth: 46,
+              opacity: sending || transcribing ? 0.5 : 1,
+            }}
           >
-            <Text
-              className={`text-base ${recording ? 'text-primary-dark' : 'text-secondary'}`}
-              style={{ fontSize: 18, lineHeight: 20 }}
-            >
-              {recording ? '■' : '🎙'}
-            </Text>
+            {recording ? (
+              <StopGlyph color="#064e3b" size={18} />
+            ) : (
+              <MicGlyph color="#e9a847" size={20} />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
