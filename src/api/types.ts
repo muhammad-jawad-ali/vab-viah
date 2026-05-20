@@ -144,6 +144,22 @@ export type OnboardingTurnResult = {
   sttTranscript?: string;
 };
 
+// STT-only endpoint. Frontend posts a voice clip + language hint, gets the
+// transcript back, drops it into the chat draft so the user can review/edit
+// before sending. Decouples STT from the LLM turn so voice → text becomes a
+// two-step UX (record → preview → send) instead of fire-and-forget.
+export type TranscribeRequest = {
+  audioBase64: string;
+  language?: LanguagePref;
+};
+export type TranscribeResponse = {
+  transcript: string;
+  confidence: number;
+  language_detected: string;
+  lowConfidence: boolean;
+  stub: boolean;
+};
+
 // Layer 1 — chat interview. Backend takes exactly one of `text` or
 // `audioBase64`; sessionId is omitted on the first call and round-tripped after.
 export type Layer1Request = {
@@ -301,7 +317,7 @@ export type TraceEvent =
   | { type: 'agent.decision'; agent: string; decision: string; rationale: string; ts: number }
   | { type: 'tool.call'; tool: string; args: unknown; ts: number }
   | { type: 'tool.result'; tool: string; result: unknown; latency_ms: number; ts: number }
-  | { type: 'agent.message'; agent: string; content: string; ts: number }
+  | { type: 'agent.message'; agent: string; content: string; candidateId?: string; ts: number }
   | { type: 'dimension.scored'; dimension: Dimension; score: number; evidence: string; ts: number }
   | { type: 'recovery'; reason: string; action: string; ts: number }
   | { type: 'task.finished'; task: string; outcome: unknown; ts: number }
@@ -322,6 +338,10 @@ export type DebateMessage = {
   dimension: Dimension | null;     // null when content didn't match `[dim] name: …`
   speakerName: string;
   statement: string;
+  // Set when backend stamps the originating debate's candidate. ReplayDebate
+  // filters by this so the user's bubbles (user_twin appears in all 5 parallel
+  // debates) don't bleed across candidates.
+  candidateId?: string;
   ts: number;
 };
 

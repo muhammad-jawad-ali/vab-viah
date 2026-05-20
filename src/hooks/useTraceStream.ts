@@ -242,6 +242,7 @@ function parseAgentMessage(
       dimension: dim,
       speakerName: (rawName ?? '').trim(),
       statement: (rawStatement ?? '').trim(),
+      ...(ev.candidateId !== undefined ? { candidateId: ev.candidateId } : {}),
       ts: ev.ts,
     };
   }
@@ -251,6 +252,7 @@ function parseAgentMessage(
     dimension: null,
     speakerName: side === 'moderator' ? 'Moderator' : '',
     statement: ev.content,
+    ...(ev.candidateId !== undefined ? { candidateId: ev.candidateId } : {}),
     ts: ev.ts,
   };
 }

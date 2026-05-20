@@ -46,8 +46,8 @@ export const ReplayDebateScreen = ({ navigation, route }: Props) => {
   const userName = useAppStore((s) => s.twinSpec?.identity.name ?? null);
 
   const grouped = useMemo(
-    () => filterAndGroup(messages ?? [], userName, displayName),
-    [messages, userName, displayName]
+    () => filterAndGroup(messages ?? [], userName, displayName, candidateTwinId),
+    [messages, userName, displayName, candidateTwinId]
   );
 
   const totalBubbles = grouped.reduce((acc, g) => acc + g.messages.length, 0);
@@ -122,14 +122,36 @@ type GroupedBlock = { dimension: Dimension | null; messages: DebateMessage[] };
 function filterAndGroup(
   all: DebateMessage[],
   userName: string | null,
-  candidateName: string
+  candidateName: string,
+  candidateId: string
 ): GroupedBlock[] {
-  // Keep messages whose speakerName matches the user OR the chosen candidate.
-  // Moderator messages are kept too, since they may carry mid-dim summaries.
+  // Primary filter: candidateId tag (backend stamps every debate message with
+  // the candidate it belongs to). This is the only correct filter under the 5
+  // parallel debates / 1 user pattern — without it, user_twin appears 5× per
+  // dim because the user is user_twin in every debate.
+  //
+  // Fallback (when candidateId tag is missing — e.g. older trace bundle from a
+  // pre-Session-7 backend, or moderator messages with no debate attribution):
+  // accept user-side messages by speakerName and accept candidate-side by name
+  // too. This preserves the original behavior on legacy data without breaking
+  // the new accurate path.
   const userMatch = userName?.toLowerCase() ?? null;
   const candMatch = candidateName.toLowerCase();
+  const tagged = all.filter((m) => m.candidateId !== undefined);
+  const hasAnyTaggedForCandidate = tagged.some((m) => m.candidateId === candidateId);
+
   const relevant = all.filter((m) => {
+    if (m.candidateId !== undefined) {
+      // Accept only messages tagged for THIS candidate.
+      return m.candidateId === candidateId;
+    }
+    // Untagged path (legacy + moderator).
     if (m.side === 'moderator') return true;
+    if (hasAnyTaggedForCandidate) {
+      // We have candidate-tagged data for this debate; untagged twin messages
+      // are stale/ambiguous — drop them to avoid the duplicate-bubble bug.
+      return false;
+    }
     const speaker = m.speakerName.toLowerCase();
     if (userMatch && speaker === userMatch) return true;
     if (speaker === candMatch) return true;

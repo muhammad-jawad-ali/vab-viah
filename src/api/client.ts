@@ -37,6 +37,8 @@ import {
   type OtpStartResponse,
   type OtpVerifyRequest,
   type OtpVerifyResponse,
+  type TranscribeRequest,
+  type TranscribeResponse,
   type TwinMeResponse,
   type WaliRequest,
   type WaliResponse,
@@ -165,6 +167,8 @@ export const api = {
   },
 
   onboarding: {
+    transcribe: (body: TranscribeRequest) =>
+      apiFetch<TranscribeResponse>('/onboarding/transcribe', { method: 'POST', body }),
     layer1: (body: Layer1Request) =>
       apiFetch<Layer1Response>('/onboarding/layer1', { method: 'POST', body }),
     layer2: (body: Layer2Request) =>

@@ -6,11 +6,11 @@
 //
 // Session 7: voice input + language toggle. Mic button beside the text input
 // records at 16kHz mono (WAV LINEAR16 on iOS, AMR_WB on Android) and POSTs
-// audioBase64 instead of text. The backend STT detects the encoding from
-// magic bytes and transcribes via Google Cloud Speech-to-Text. The transcript
-// is echoed back on `turn.sttTranscript` so the user bubble shows what was
-// actually understood (low STT confidence falls through to chip_options like
-// any other layer-1 fallback).
+// audioBase64 to /onboarding/transcribe (STT-only, no LLM turn). Transcript
+// lands in the chat draft so the user can review/edit before tapping Send —
+// requested in the Session-7 hotfix because auto-send was an opaque round-trip.
+// Low STT confidence still surfaces an inline warning + the chip-fallback chips
+// from the agent's previous reply.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -100,6 +100,7 @@ export const OnboardingLayer1Screen = () => {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(existingSessionId);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
@@ -222,7 +223,7 @@ export const OnboardingLayer1Screen = () => {
   };
 
   const startRecording = async () => {
-    if (sending || recording) return;
+    if (sending || recording || transcribing) return;
     try {
       const perm = await Audio.requestPermissionsAsync();
       if (perm.status !== 'granted') {
@@ -252,7 +253,9 @@ export const OnboardingLayer1Screen = () => {
     }
   };
 
-  const stopRecordingAndSend = async () => {
+  // Session-7 hotfix UX: stop recording → transcribe-only → drop the text into
+  // the chat draft so the user can read it BEFORE sending. No auto-send.
+  const stopRecordingAndPreview = async () => {
     const rec = recordingRef.current;
     if (!rec) {
       setRecording(false);
@@ -279,33 +282,40 @@ export const OnboardingLayer1Screen = () => {
       return;
     }
 
-    // Drop an optimistic "🎙️ Voice…" bubble that gets replaced once the STT
-    // transcript comes back.
-    setHistory((h) => [...h, { role: 'user', text: '🎙️ Voice…', voice: true }]);
-    const optimisticIdx = history.length;
-    setSending(true);
-
+    setTranscribing(true);
     try {
       const audioBase64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      await postLayer1(
-        {
-          ...(sessionId ? { sessionId } : {}),
-          language,
-          audioBase64,
-        },
-        optimisticIdx
-      );
+      const res = await api.onboarding.transcribe({ audioBase64, language });
+      if (!res.transcript || res.stub) {
+        Alert.alert(
+          'Could not transcribe',
+          res.stub
+            ? 'Speech-to-text is not configured on the server.'
+            : "I couldn't catch that — try recording again in a quieter spot, or just type your reply."
+        );
+      } else {
+        // Append/replace the draft with the transcript. If there was already
+        // typed text, prepend the transcript with a space so the user can
+        // continue editing without losing what they typed.
+        setDraft((prev) =>
+          prev.trim().length > 0 ? `${res.transcript} ${prev}` : res.transcript
+        );
+        if (res.lowConfidence) {
+          // Low confidence — let them know but still show the draft so they
+          // can fix it up rather than re-record.
+          Alert.alert(
+            'Low STT confidence',
+            'Please double-check the transcript before sending. You can edit it inline.'
+          );
+        }
+      }
     } catch (err) {
-      setSending(false);
-      const msg = err instanceof Error ? err.message : 'Could not read recorded audio.';
-      Alert.alert('Send failed', msg);
-      setHistory((h) => {
-        const next = [...h];
-        next.splice(optimisticIdx, 1);
-        return next;
-      });
+      const msg = err instanceof ApiError ? err.message : 'Could not transcribe audio.';
+      Alert.alert('Transcribe failed', msg);
+    } finally {
+      setTranscribing(false);
     }
   };
 
@@ -455,7 +465,16 @@ export const OnboardingLayer1Screen = () => {
               />
             </View>
             <Text className="text-secondary text-[11px] uppercase tracking-widest font-bold">
-              Listening… tap stop to send
+              Listening… tap stop to preview
+            </Text>
+          </View>
+        )}
+
+        {transcribing && (
+          <View className="px-5 pb-2 flex-row items-center justify-center gap-2">
+            <ActivityIndicator size="small" color="#e9a847" />
+            <Text className="text-secondary text-[11px] uppercase tracking-widest font-bold">
+              Transcribing… review before sending
             </Text>
           </View>
         )}
@@ -467,44 +486,53 @@ export const OnboardingLayer1Screen = () => {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder={recording ? 'Listening…' : 'Type your reply…'}
+            placeholder={
+              recording
+                ? 'Listening…'
+                : transcribing
+                  ? 'Transcribing…'
+                  : 'Type your reply or tap 🎙'
+            }
             placeholderTextColor="#059669"
             multiline
-            editable={!sending && !recording}
+            editable={!sending && !recording && !transcribing}
             className="flex-1 bg-primary border border-primary-light/20 rounded-2xl px-4 py-3 text-surface text-[15px]"
             style={{ maxHeight: 110, minHeight: 46 }}
           />
 
-          {/* Mic button — toggles record/stop. Hidden when there's a text draft. */}
-          {draft.trim().length === 0 ? (
-            <TouchableOpacity
-              onPress={recording ? stopRecordingAndSend : startRecording}
-              disabled={sending}
-              accessibilityRole="button"
-              accessibilityLabel={recording ? 'Stop recording and send' : 'Record voice answer'}
-              accessibilityState={{ busy: recording }}
-              className={`rounded-2xl px-4 py-3 items-center justify-center ${
-                recording ? 'bg-saffron' : 'bg-primary border border-secondary/40'
-              }`}
-              style={{ minHeight: 46, opacity: sending ? 0.5 : 1 }}
+          {/* Mic button — always shown so the user can append a voice clip even
+              with text already in the draft. Disabled while sending or
+              transcribing to avoid concurrent state. */}
+          <TouchableOpacity
+            onPress={recording ? stopRecordingAndPreview : startRecording}
+            disabled={sending || transcribing}
+            accessibilityRole="button"
+            accessibilityLabel={recording ? 'Stop recording and preview transcript' : 'Record voice answer'}
+            accessibilityState={{ busy: recording || transcribing }}
+            className={`rounded-2xl px-4 py-3 items-center justify-center ${
+              recording ? 'bg-saffron' : 'bg-primary border border-secondary/40'
+            }`}
+            style={{ minHeight: 46, opacity: sending || transcribing ? 0.5 : 1 }}
+          >
+            <Text
+              className={`text-base ${recording ? 'text-primary-dark' : 'text-secondary'}`}
+              style={{ fontSize: 18, lineHeight: 20 }}
             >
-              <Text
-                className={`text-base ${recording ? 'text-primary-dark' : 'text-secondary'}`}
-                style={{ fontSize: 18, lineHeight: 20 }}
-              >
-                {recording ? '■' : '🎙'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
+              {recording ? '■' : '🎙'}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => sendMessage(draft)}
-            disabled={sending || draft.trim().length === 0 || recording}
+            disabled={sending || draft.trim().length === 0 || recording || transcribing}
             accessibilityRole="button"
             accessibilityLabel="Send message"
             className="bg-secondary rounded-2xl px-5 py-3 items-center justify-center"
             style={{
-              opacity: sending || draft.trim().length === 0 || recording ? 0.5 : 1,
+              opacity:
+                sending || draft.trim().length === 0 || recording || transcribing
+                  ? 0.5
+                  : 1,
               minHeight: 46,
             }}
           >
