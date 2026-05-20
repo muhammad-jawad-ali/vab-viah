@@ -206,7 +206,11 @@ User landed on real device with the EAS update + new APK; surfaced four real bug
   - Frontend: `fix(session-7-hotfix): voice preview-before-send + replay dedup by candidateId` — `8ec39cc`
 - [x] **EAS Update** group `5f714a64-fbfa-4cd2-9f41-522b0c99e4c4` published to preview channel (commit `8ec39cc`). Lands on existing iOS/Android preview builds on next launch.
 - [x] **Android APK rebuild FINISHED.** Build `9d971f55-1e0f-4221-bb71-b0c1aa5fcc14` at commit `8ec39cc`. Install link: https://expo.dev/artifacts/eas/ksFbQZuxqNmhXZkpF1KPVw.apk (or the build page https://expo.dev/accounts/hadeeed147/projects/LabViah/builds/9d971f55-1e0f-4221-bb71-b0c1aa5fcc14). Teammates should uninstall the previous APK first (a7c9fdc5) then install this one — different signing key may block over-the-top install.
-- [ ] **Railway deploy STILL PENDING after 3-hour wait.** Railway infrastructure recovered (/health returns 200, /health/maps still live with Maps Places API working) BUT my hotfix code is NOT on Railway yet — `/onboarding/transcribe` still 404, meaning the old deploy is serving. Root cause: Railway CLI OAuth token is permanently invalidated (`invalid_grant`, not the earlier transient Cloudflare 525). User needs to `railway login` interactively (browser flow) so the CLI can authenticate. After that, `railway up --detach` from `D:/Projects/rishtaai/backend` will push the new code. Alternative: Railway dashboard manual redeploy from project `2ad04a88-1859-457b-95c6-2415365174ed`.
+- [x] **Railway deploy LIVE.** User re-ran `railway login` (refresh token had expired during the 3-hour Railway outage). `railway up --detach` then pushed deployment `81094ab3-ea23-481d-9de3-6cd1f5092066` which built in ~3 min and swapped in. Verified live:
+  - `GET /health` → 200 `{service:"rishtaai-backend",env:"production"}`
+  - `POST /onboarding/transcribe` (empty body) → 400 `BAD_REQUEST: audioBase64 Required` (route exists, Zod rejecting empty payload as expected)
+  - `GET /health/maps?city=Karachi` → `verdict:"live"`, Saltanat Restaurant, 545ms, Places API still healthy
+- [x] **Submission-ready handoff** at session close. All four real-device bugs from the user's screenshots/logs are mitigated and shipped end-to-end (local → GitHub → Railway → EAS Update → Android APK).
 
 ### Pending for the user (post-session)
 
