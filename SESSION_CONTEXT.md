@@ -212,6 +212,26 @@ User landed on real device with the EAS update + new APK; surfaced four real bug
   - `GET /health/maps?city=Karachi` → `verdict:"live"`, Saltanat Restaurant, 545ms, Places API still healthy
 - [x] **Submission-ready handoff** at session close. All four real-device bugs from the user's screenshots/logs are mitigated and shipped end-to-end (local → GitHub → Railway → EAS Update → Android APK).
 
+**Session 7 final-polish pass (2026-05-20):**
+
+After deploy landed, user surfaced two more issues from the demo run:
+
+- [x] **Pro 12s timeout cascade.** Railway logs showed "Vertex Gemini gemini-2.5-pro exceeded 12000ms" on roughly 1-in-3 Pro calls. Root cause: 10 concurrent Pro calls + thinking-token tax routinely take 15-22s, but [_shared/gemini.ts](../../backend/src/agents/_shared/gemini.ts) had `PRIMARY_TIMEOUT_MS = 12_000` (designed for Flash's 1-3s typical). Fix: bump to 25_000ms. 2 attempts × 25s + Flash fallback = ~55s worst case, still fits the 60s per-debate budget. Backend commit `8ab2738` deployed to Railway, verified live via `/onboarding/transcribe` returning 400 instead of timing out.
+- [x] **Mic emoji aesthetic.** 🎙 and ■ glyphs felt "AI/cringe" per user. Swap for custom 1.75px stroke SVG drawn inline via `react-native-svg` (already installed): idle state = saffron mic outline, recording = filled emerald square. Also dropped 🎙 from the textarea placeholder ("Type your reply or tap 🎙" → "Type your reply…") for a quieter chat surface. Pure JS change.
+- [x] **Final EAS Update** published: group `06562ac5-174c-4fc7-ad90-6a645cba4551` (commit `8121037`). iOS / Android both auto-pull on next launch for runtime 1.0.0 clients.
+- [x] **Final Android APK** queued: build `cb043a6a-a032-417c-b9e3-89693fd2dd99` (https://expo.dev/accounts/hadeeed147/projects/LabViah/builds/cb043a6a-a032-417c-b9e3-89693fd2dd99). Supersedes `9d971f55`.
+- [x] **Typecheck clean on both repos.**
+
+### Session 7 commits (chronological)
+- Backend `07987d8` — real STT + /health/maps diagnostic (Session 7 original)
+- Frontend `abbadbc` — voice input + language toggle (Session 7 original)
+- Frontend `62ed939` — Maps Places API verified live (docs)
+- Backend `63bc90a` — Session 7 hotfix: ur-PK STT + Pro everywhere + candidateId debate dedupe
+- Frontend `8ec39cc` — Session 7 hotfix: voice preview-before-send + replay filter by candidateId
+- Frontend `1b02747` + `9bfc83d` — Session 7 hotfix docs (Railway recovery log)
+- Backend `8ab2738` — Pro 12s→25s primary timeout
+- Frontend `8121037` — clean mic SVG glyphs, drop emoji from placeholder
+
 ### Pending for the user (post-session)
 
 - **Rebuild the APK** to pick up the `expo-av` native module + mic permission added in app.json. The user aborted the pre-Session-7 APK build; relaunch via `npx eas-cli build --profile preview --platform android` after Session 7 lands on Railway. EAS Update will NOT propagate the mic permission — only a native build will.
