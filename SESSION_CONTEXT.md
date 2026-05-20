@@ -222,6 +222,24 @@ After deploy landed, user surfaced two more issues from the demo run:
 - [x] **Final Android APK** FINISHED: build `cb043a6a-a032-417c-b9e3-89693fd2dd99` at commit `8121037`. Install link: **https://expo.dev/artifacts/eas/r52h2P42XpFmaNDBq1BGtB.apk**. Supersedes the prior `9d971f55` (ksFbQZuxqNmhXZkpF1KPVw.apk) — teammates should uninstall any prior LabViah APK before installing this one.
 - [x] **Typecheck clean on both repos.**
 
+**Session 7 emergency host migration Railway → Render (2026-05-20):**
+
+After the final-polish pass landed locally, Railway paused deploys
+account-wide ("Limited Access — Deploys have been paused temporarily"),
+blocking commit `a8e8247` (schema fixes + maps preview) from going live.
+Live Railway deploy `4f8fca2b` was missing the schema-padding fixes →
+twin debates were truncating on Pro outputs → not demo-worthy.
+
+- [x] **New backend host: Render.com.** New repo `Hadeeed147/lab-viah-backend` (mirror of `ZakiNabeel/Lab-Viah/backend/main`). New `backend/render.yaml` blueprint declares the web service + 13 env vars synced from Railway dashboard (Supabase x4, GCP x3, Vertex models x2, Maps key, dev OTP bypass x3, GOOGLE_APPLICATION_CREDENTIALS_JSON pasted as raw JSON which config.ts self-heals to a /tmp file path on boot). Free tier (sleeps after 15 min idle; warmup ~30s).
+- [x] **New backend URL: `https://lab-viah-backend.onrender.com`**. Verified live at session close:
+  - `/onboarding/transcribe` (new route since hotfix `63bc90a`) returns 400 BAD_REQUEST on empty body — confirms new code deployed.
+  - `/health/maps?city=Karachi` returns `verdict:"live"`, Saltanat Restaurant from `maps_places`, 636ms.
+- [x] **Frontend repointed.** `eas.json` all three profiles + `src/api/client.ts` PROD_FALLBACK_URL + local `.env` swapped to Render URL. Old Railway URL kept commented as legacy reference.
+- [x] **Final EAS Update**: group `6cccdcbb-d646-4ce3-b2aa-fbff16f4c12e` (commit `699f710`) published to preview channel — auto-pulls into Expo Go + existing iOS/Android preview builds on next launch.
+- [x] **Final Android APK**: build `a993972d-e69c-4f28-b80f-0c3e77fcecbf` queued with Render URL baked in. Supersedes all prior APKs.
+
+⚠️ **Render free-tier note for demo day**: idle service spins down after 15 min. Hit `curl https://lab-viah-backend.onrender.com/health/maps?city=Karachi` ~2-3 min BEFORE starting the demo to warm the container. First cold request takes ~30s; subsequent requests are normal.
+
 ### Session 7 commits (chronological)
 - Backend `07987d8` — real STT + /health/maps diagnostic (Session 7 original)
 - Frontend `abbadbc` — voice input + language toggle (Session 7 original)
@@ -231,6 +249,11 @@ After deploy landed, user surfaced two more issues from the demo run:
 - Frontend `1b02747` + `9bfc83d` — Session 7 hotfix docs (Railway recovery log)
 - Backend `8ab2738` — Pro 12s→25s primary timeout
 - Frontend `8121037` — clean mic SVG glyphs, drop emoji from placeholder
+- Backend `a8e8247` — Pro truncation schema padding + DEBATE_MAX_TOKENS 4096 + Static Maps URL on Venue
+- Frontend `545fbe1` — inline static-maps thumbnail per proposed venue
+- Backend `6162124` — `.railwayignore` (then proved moot when Railway paused deploys)
+- Backend `8a8512c` — `render.yaml` blueprint for Render.com hosting
+- Frontend `699f710` — repoint API URL Railway → Render
 
 ### Pending for the user (post-session)
 
